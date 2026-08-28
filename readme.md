@@ -69,7 +69,7 @@ video output. The stages that need a model provider are stubbed behind their por
 | Whiteboard aesthetic | ✅ real — every scene is a diagram (one of thirteen shapes), HTML/CSS for text and SVG for strokes, enforced by a pre-render gate |
 | Story plan review before illustration | ✅ real — the scene set, order and per-scene shape are judged and revised before a board exists |
 | Found images on a board | ✅ real — Wikimedia Commons, Unsplash, Pexels; inlined, credited, selectable per request |
-| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default |
+| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default. Works with **no credential** via `WEB_SEARCH_DRIVER=duckduckgo` |
 | Found diagrams draw themselves | ✅ real — contours traced once into SVG strokes, revealed like every other drawn line, deterministic per frame |
 | Visual plan + vision judge | ✅ real — palette chosen per video, scenes judged from screenshots |
 

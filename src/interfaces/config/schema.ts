@@ -282,12 +282,18 @@ export const envSchema = z.object({
   /**
    * Web search, for research and for the `web_search` image source.
    *
-   * `gemini` needs no new credential — it uses the `google_search` tool on
+   * `duckduckgo` needs **no credential of any kind** — it reads the
+   * no-JavaScript endpoint, and its images come from Openverse, which is
+   * keyless and returns a real licence with every result. It is the option that
+   * makes research and web images usable without signing up for anything, and
+   * the one that can break on a markup change; it degrades to "found nothing"
+   * rather than failing a job.
+   *
+   * `gemini` needs no *new* credential — it uses the `google_search` tool on
    * GEMINI_API_KEY — but it can only answer *research*: grounding returns pages,
-   * never images. `brave` answers both, and is what a deployment wanting
-   * `web_search` on a board needs.
+   * never images. `brave` answers both and wants its own key.
    */
-  WEB_SEARCH_DRIVER: z.enum(['none', 'gemini', 'brave']).default('none'),
+  WEB_SEARCH_DRIVER: z.enum(['none', 'duckduckgo', 'gemini', 'brave']).default('none'),
   BRAVE_API_KEY: z.string().optional(),
   WEB_SEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   /** Wikimedia's API policy requires a real contact address in the User-Agent. */

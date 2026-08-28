@@ -107,6 +107,71 @@ export const SCENARIOS: Record<string, E2eScenario> = {
   default: DEFAULT_SCENARIO,
 
   /**
+   * A one-minute explainer for high-school students.
+   *
+   * Short on purpose: a sixty-second target leaves room for four or five scenes,
+   * so the script stage has to *choose* what matters rather than narrate the
+   * whole passage — which is the harder job and the one a duration budget is
+   * supposed to force.
+   *
+   * The source states each relationship in the shape a board can draw: the
+   * circuit returns to where it started (a cycle), the two sides differ in one
+   * stated way (a comparison), the wall is thicker for a stated reason (a
+   * proportion). Material that merely listed facts would let every scene default
+   * to `focus` and prove nothing.
+   *
+   * `high_school` is doing real work here too — it reaches the narration brief
+   * through `PersonalisationPolicy`, so the register and the assumed prior
+   * knowledge both come from it.
+   */
+  heart: {
+    name: 'Heart function — high school, one minute',
+    outputLanguage: 'en',
+    targetDurationSeconds: 60,
+    style: 'explainer',
+    studentContext: {
+      level: 'high_school',
+      goal: 'understand how blood moves through the heart',
+    },
+    sourceText: `
+The heart is a muscular pump that moves blood around the body. It sits between the lungs
+and is about the size of a closed fist. It is divided into four chambers: the right atrium
+and right ventricle on one side, and the left atrium and left ventricle on the other. A
+wall of muscle called the septum separates the right side from the left side, so the blood
+on the two sides never mixes.
+
+Blood returning from the body is low in oxygen. It enters the right atrium through two large
+veins, the superior and inferior vena cava. The right atrium contracts and pushes the blood
+into the right ventricle. The right ventricle then contracts and sends the blood through the
+pulmonary artery to the lungs. In the lungs the blood releases carbon dioxide and picks up
+oxygen.
+
+The oxygen-rich blood returns from the lungs through the pulmonary veins and enters the left
+atrium. The left atrium pushes it into the left ventricle. The left ventricle contracts and
+forces the blood out through the aorta, the largest artery in the body, which carries it to
+every organ and tissue. The blood then returns to the right atrium, and the circuit begins
+again.
+
+The left ventricle has a much thicker muscular wall than the right ventricle. The right
+ventricle only pumps blood as far as the lungs, which are close by, while the left ventricle
+must generate enough pressure to push blood around the entire body. Thicker muscle produces
+greater force.
+
+Four valves keep the blood moving in one direction. The tricuspid valve lies between the
+right atrium and the right ventricle, and the mitral valve lies between the left atrium and
+the left ventricle. The pulmonary valve guards the entrance to the pulmonary artery, and the
+aortic valve guards the entrance to the aorta. When a ventricle contracts, the valve behind
+it snaps shut, which prevents blood from flowing backwards. The familiar heartbeat sound is
+made by these valves closing.
+
+One complete sequence of contraction and relaxation is called the cardiac cycle. During
+systole the heart muscle contracts and pushes blood out. During diastole the muscle relaxes
+and the chambers fill again. A resting adult heart completes this cycle about seventy times
+a minute.
+`.trim(),
+  },
+
+  /**
    * Process-and-cycle coverage, paired with `default`.
    *
    * Chosen because it states both relationships explicitly and separately: a

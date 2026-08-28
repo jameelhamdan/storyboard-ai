@@ -79,6 +79,8 @@ import { TracingIllustrationFinder } from '@infrastructure/image/TracingIllustra
 import type { WebSearchPort } from '@application/port/WebSearchPort.js';
 import { BraveSearchClient, BraveWebSearch } from '@infrastructure/search/BraveSearchClient.js';
 import { GeminiGroundedSearch } from '@infrastructure/search/GeminiGroundedSearch.js';
+import { DuckDuckGoSearch } from '@infrastructure/search/DuckDuckGoSearch.js';
+import { OpenverseImageSource } from '@infrastructure/image/OpenverseImageSource.js';
 import { UnsplashImageSource } from '@infrastructure/image/UnsplashImageSource.js';
 import { PexelsImageSource } from '@infrastructure/image/PexelsImageSource.js';
 import { WikimediaImageSource } from '@infrastructure/image/WikimediaImageSource.js';
@@ -331,9 +333,23 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
       userAgent: env.IMAGE_USER_AGENT,
     }));
   }
+  /**
+   * The open web as a library, from whichever backend is configured.
+   *
+   * Openverse rather than the search engine's own image results when there is
+   * no Brave key: it is keyless *and* returns a licence with every result,
+   * which is the difference between a board that can be credited and one that
+   * cannot. Scraping general image results would be keyless too, and unusable
+   * for the same reason.
+   */
   if (brave) {
     imageRegistry.register('web_search', new WebSearchImageSource(brave, {
       requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+    }));
+  } else if (env.WEB_SEARCH_DRIVER === 'duckduckgo') {
+    imageRegistry.register('web_search', new OpenverseImageSource({
+      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+      userAgent: env.IMAGE_USER_AGENT,
     }));
   }
 
@@ -351,6 +367,11 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
 
   const webSearch: WebSearchPort | undefined = brave
     ? new BraveWebSearch(brave)
+    : env.WEB_SEARCH_DRIVER === 'duckduckgo'
+      ? new DuckDuckGoSearch({
+          requestTimeoutMs: env.WEB_SEARCH_TIMEOUT_MS,
+          userAgent: env.IMAGE_USER_AGENT,
+        })
     : env.WEB_SEARCH_DRIVER === 'gemini'
       ? new GeminiGroundedSearch({
           apiKey: requireEnv(env.GEMINI_API_KEY, 'GEMINI_API_KEY'),
