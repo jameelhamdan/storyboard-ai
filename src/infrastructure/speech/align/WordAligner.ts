@@ -19,10 +19,22 @@ export interface WordAligner {
   readonly name: string;
 
   /**
+   * `text` is what was *asked* to be spoken, and it changes the problem.
+   *
+   * Open transcription has to work out both the words and their times;
+   * alignment only has to place words it already knows. Every caller here
+   * synthesized the audio from text it still holds, so withholding it would be
+   * throwing away the easier problem — an aligner that can use it does forced
+   * alignment, and one that cannot simply ignores it.
+   *
    * Returns an empty list rather than throwing when alignment fails: the audio
    * is already correct and already paid for, and the documented reveal fallback
    * inherits the previous element's time. Losing the timeline is bad; losing
    * the narration too would be worse.
    */
-  align(audioPath: string, signal?: AbortSignal): Promise<readonly WordTiming[]>;
+  align(input: {
+    audioPath: string;
+    text?: string;
+    signal?: AbortSignal;
+  }): Promise<readonly WordTiming[]>;
 }

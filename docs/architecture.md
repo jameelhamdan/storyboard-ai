@@ -109,6 +109,7 @@ and the model-facing ones also have a stub.
 | `IllustrationFinderPort` | `CompositeImageSource` — asks the permitted sources in the order `ImageSourcePolicy` gives — wrapped by `TracingIllustrationFinder`, which draws a found diagram as strokes | — (absent when no key is configured) |
 | `SpeechSynthesisPort` | `OpenAiSpeechSynthesizer`, `ElevenLabsSpeechSynthesizer`, `GeminiSpeechSynthesizer` | `StubSpeechSynthesizer` |
 | `TranscriptionPort` | `WhisperCliTranscriber` | `StubTranscriber` |
+| `WordAligner` (infrastructure-only) | `WhisperCliWordAligner`, `GeminiWordAligner`, `OpenAiWordAligner` — recovers word timings for a synthesiser that reports none | — |
 | `SceneRendererPort` / `ScenePreviewPort` | `PlaywrightSceneRenderer` / `PlaywrightScenePreviewer` | — |
 | `VideoEncoderPort` | `FfmpegAssembler` | — |
 | `ObjectStoragePort` | `LocalObjectStorage` | — |

@@ -89,6 +89,7 @@ import { WhisperCliTranscriber } from '@infrastructure/speech/WhisperCliTranscri
 import type { WordAligner } from '@infrastructure/speech/align/WordAligner.js';
 import { WhisperCliWordAligner } from '@infrastructure/speech/align/WhisperCliWordAligner.js';
 import { OpenAiWordAligner } from '@infrastructure/speech/align/OpenAiWordAligner.js';
+import { GeminiWordAligner } from '@infrastructure/speech/align/GeminiWordAligner.js';
 
 export interface Container {
   /** The bounded connection — safe to await on a request path. */
@@ -207,11 +208,19 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
   /**
    * The aligner a synthesiser without native word timings will borrow.
    *
-   * Local whisper.cpp first: it is free, and narration audio staying on the
-   * machine is the reason STT has no hosted option at all. The OpenAI endpoint
-   * is the fallback, and only when that key is already present — adding a second
-   * vendor to the data path is a decision, not a default. Neither available
-   * means no timings, which the synthesiser reports per scene.
+   * The order is about what each one *adds*, not about quality:
+   *
+   * 1. **whisper.cpp**, when it is configured — free, and the narration never
+   *    leaves the machine, which is the reason STT has no hosted option at all.
+   * 2. **Gemini**, when its key is present — no new credential for a deployment
+   *    already running Gemini, and it is given the narration text, so it does
+   *    forced alignment rather than transcription.
+   * 3. **OpenAI**, when its key is present — the original path, and the only one
+   *    that adds a second vendor to the data path.
+   *
+   * None available means no timings, which the synthesiser reports per scene:
+   * the narration is still correct and every reveal inherits the previous
+   * element's time.
    */
   const aligner: WordAligner | undefined = env.STT_DRIVER === 'whisper'
     ? new WhisperCliWordAligner({
@@ -220,13 +229,19 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
         threads: env.WHISPER_THREADS,
         timeoutMs: env.STT_TIMEOUT_MS,
       }, ffmpeg, logger)
-    : env.OPENAI_API_KEY
-      ? new OpenAiWordAligner({
-          apiKey: env.OPENAI_API_KEY,
-          model: env.OPENAI_TTS_ALIGN_MODEL,
+    : env.GEMINI_API_KEY
+      ? new GeminiWordAligner({
+          apiKey: env.GEMINI_API_KEY,
+          model: env.GEMINI_ALIGN_MODEL,
           requestTimeoutMs: env.TTS_TIMEOUT_MS,
         }, logger)
-      : undefined;
+      : env.OPENAI_API_KEY
+        ? new OpenAiWordAligner({
+            apiKey: env.OPENAI_API_KEY,
+            model: env.OPENAI_TTS_ALIGN_MODEL,
+            requestTimeoutMs: env.TTS_TIMEOUT_MS,
+          }, logger)
+        : undefined;
 
   /**
    * Per-driver price overrides, because "what a minute of narration costs"
@@ -237,7 +252,16 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
    * whisper aligner costs nothing, and charging for it would put a number in
    * cost.json that no invoice will ever contain.
    */
-  const alignmentPerAudioHour = aligner?.name === 'openai' ? 0.36 : 0;
+  /**
+   * What the alignment pass costs, per hour of synthesized audio.
+   *
+   * whisper.cpp is genuinely free. Gemini bills the audio as input tokens —
+   * roughly 32 per second, so an hour is ~115k tokens plus a few thousand out,
+   * which lands near a dime. OpenAI's is a published per-minute rate.
+   */
+  const alignmentPerAudioHour = aligner?.name === 'openai'
+    ? 0.36
+    : aligner?.name === 'gemini' ? 0.10 : 0;
 
   const pricing = env.TTS_DRIVER === 'openai'
     ? { ...DEFAULT_PRICING, ttsPerMillionChars: 15.0, ttsAlignmentPerAudioHour: 0.36 }

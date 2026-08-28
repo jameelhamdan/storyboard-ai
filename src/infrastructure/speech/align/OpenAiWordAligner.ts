@@ -37,13 +37,23 @@ export class OpenAiWordAligner implements WordAligner {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
   }
 
-  public async align(audioPath: string, signal?: AbortSignal): Promise<readonly WordTiming[]> {
+  public async align(input: {
+    audioPath: string;
+    text?: string;
+    signal?: AbortSignal;
+  }): Promise<readonly WordTiming[]> {
+    const { audioPath, signal } = input;
     try {
       const form = new FormData();
       form.append('file', new Blob([await readFile(audioPath)]), 'narration.wav');
       form.append('model', this.options.model);
       form.append('response_format', 'verbose_json');
       form.append('timestamp_granularities[]', 'word');
+      // Whisper's `prompt` biases decoding toward text it is told to expect,
+      // which is exactly what we have. It is a hint, not a constraint — this is
+      // still transcription — but a mishearing is what puts a word at the wrong
+      // time, and this is the cheapest thing that reduces them.
+      if (input.text) form.append('prompt', input.text.slice(0, 900));
 
       const timeout = AbortSignal.timeout(this.options.requestTimeoutMs);
       const response = await fetch(`${this.baseUrl}/v1/audio/transcriptions`, {

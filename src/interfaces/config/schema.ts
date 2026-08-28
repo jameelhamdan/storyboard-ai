@@ -243,6 +243,14 @@ export const envSchema = z.object({
   /** Recovers word timings from the synthesized audio. */
   OPENAI_TTS_ALIGN_MODEL: z.string().default('whisper-1'),
   /**
+   * Places the narration's words on the audio Gemini just synthesized.
+   *
+   * Any audio-capable Gemini model. It is given the text as well as the audio,
+   * so this is forced alignment rather than transcription — see
+   * GeminiWordAligner.
+   */
+  GEMINI_ALIGN_MODEL: z.string().default('gemini-3.7-flash'),
+  /**
    * `gemini` reuses GEMINI_API_KEY. Like OpenAI it returns no word timings, and
    * unlike OpenAI it cannot recover them on its own key — so it borrows an
    * aligner: local whisper.cpp when STT_DRIVER=whisper, the OpenAI transcription

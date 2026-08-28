@@ -80,7 +80,11 @@ export class GeminiSpeechSynthesizer implements SpeechSynthesisPort {
 
     const durationMs = Math.round((await this.ffmpeg.durationSeconds(input.outputPath, input.signal)) * 1000);
     const wordTimings = this.aligner
-      ? await this.aligner.align(input.outputPath, input.signal)
+      ? await this.aligner.align({
+          audioPath: input.outputPath,
+          text: input.text,
+          ...(input.signal ? { signal: input.signal } : {}),
+        })
       : [];
 
     if (wordTimings.length === 0) {

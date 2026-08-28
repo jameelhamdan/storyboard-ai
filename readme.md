@@ -137,7 +137,7 @@ word timings come from — not voice quality.
 |---|---|---|
 | `openai` | Recovered: the adapter transcribes its own audio with `whisper-1` | ~$0.107 (~$0.036/video-min) |
 | `elevenlabs` | Authoritative: per-character alignment returned with the audio | ~$0.089 (~$0.030/video-min) |
-| `gemini` | Recovered, by whichever aligner is available: local whisper.cpp when `STT_DRIVER=whisper`, otherwise the OpenAI transcription endpoint if that key is set. With neither, the narration is still correct and reveals fall back to inherited timing — the boot log says which | ~$0.086 (~$0.029/video-min) with the local aligner |
+| `gemini` | Recovered on the same key: the narration text and the audio go back to Gemini, which places known words rather than transcribing unknown ones. Local whisper.cpp takes precedence when `STT_DRIVER=whisper`; OpenAI is the last fallback. The boot log says which | ~$0.09 (~$0.03/video-min) |
 | `stub` | Real timings over silence | free |
 
 All three are inside the target. `openai` costs a little more because it

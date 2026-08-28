@@ -88,7 +88,11 @@ export class OpenAiSpeechSynthesizer implements SpeechSynthesisPort {
     await writeFile(input.outputPath, audio);
 
     const durationMs = Math.round((await this.ffmpeg.durationSeconds(input.outputPath, input.signal)) * 1000);
-    const wordTimings = await this.aligner.align(input.outputPath, input.signal);
+    const wordTimings = await this.aligner.align({
+      audioPath: input.outputPath,
+      text: input.text,
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
 
     if (wordTimings.length === 0) {
       // Loud: silently falling back to even spacing looks like working sync

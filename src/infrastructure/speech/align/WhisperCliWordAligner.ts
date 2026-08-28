@@ -36,7 +36,14 @@ export class WhisperCliWordAligner implements WordAligner {
     private readonly logger: LoggerPort,
   ) {}
 
-  public async align(audioPath: string, signal?: AbortSignal): Promise<readonly WordTiming[]> {
+  public async align(input: {
+    audioPath: string;
+    text?: string;
+    signal?: AbortSignal;
+  }): Promise<readonly WordTiming[]> {
+    // `text` is unused: whisper.cpp has no forced-alignment mode, so this is
+    // open transcription of speech we happen to know the words of.
+    const { audioPath, signal } = input;
     // whisper.cpp reads 16 kHz mono WAV and nothing else.
     const wavPath = join(dirname(audioPath), `${Date.now()}-align.wav`);
     const outputPrefix = `${wavPath}.out`;
