@@ -1,5 +1,8 @@
-import { lookup } from 'node:dns/promises';
+import { lookup as resolveDns } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { Readable } from 'node:stream';
 import { UnsupportedFormatError } from '@domain/error/UnsupportedFormatError.js';
 
 export interface SafeFetchOptions {
@@ -45,42 +48,34 @@ export class SafeHttpClient {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new UnsupportedFormatError(`Timed out fetching '${rawUrl}'.`, { url: rawUrl });
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), remaining);
+      const response = await this.send(url, pinned, remaining);
+      const status = response.statusCode ?? 0;
 
-      try {
-        const response = await globalThis.fetch(pinned.requestUrl, {
-          redirect: 'manual',
-          signal: controller.signal,
-          headers: { Host: pinned.hostHeader, 'User-Agent': 'studycore-generation/0.1 (+https://studycore.example)' },
-        });
-
-        if ([301, 302, 303, 307, 308].includes(response.status)) {
-          const location = response.headers.get('location');
-          if (!location) {
-            throw new UnsupportedFormatError(`Redirect from '${url.href}' had no Location header.`, { url: url.href });
-          }
-          // Re-validated from scratch: a redirect into 127.0.0.1 is the classic bypass.
-          url = this.parseAndValidate(new URL(location, url).href);
-          continue;
+      if ([301, 302, 303, 307, 308].includes(status)) {
+        const location = response.headers.location;
+        response.resume();   // drain, so the socket can be reused or closed cleanly
+        if (!location) {
+          throw new UnsupportedFormatError(`Redirect from '${url.href}' had no Location header.`, { url: url.href });
         }
-
-        if (!response.ok) {
-          throw new UnsupportedFormatError(
-            `Fetching '${url.href}' returned HTTP ${response.status}.`,
-            { url: url.href, status: response.status },
-          );
-        }
-
-        return {
-          url: url.href,
-          status: response.status,
-          contentType: response.headers.get('content-type') ?? undefined,
-          body: await this.readCapped(response, url.href),
-        };
-      } finally {
-        clearTimeout(timer);
+        // Re-validated from scratch: a redirect into 127.0.0.1 is the classic bypass.
+        url = this.parseAndValidate(new URL(location, url).href);
+        continue;
       }
+
+      if (status < 200 || status >= 300) {
+        response.resume();
+        throw new UnsupportedFormatError(
+          `Fetching '${url.href}' returned HTTP ${status}.`,
+          { url: url.href, status },
+        );
+      }
+
+      return {
+        url: url.href,
+        status,
+        contentType: response.headers['content-type'],
+        body: await this.readCapped(response, url.href),
+      };
     }
 
     throw new UnsupportedFormatError(
@@ -108,12 +103,12 @@ export class SafeHttpClient {
   }
 
   /** Resolve first, check the address, then connect to that exact address. */
-  private async resolveAndCheck(url: URL): Promise<{ requestUrl: string; hostHeader: string }> {
+  private async resolveAndCheck(url: URL): Promise<string> {
     const hostname = url.hostname.replace(/^\[|\]$/g, '');
 
     const address = isIP(hostname)
       ? hostname
-      : (await lookup(hostname, { verbatim: true })).address;
+      : (await resolveDns(hostname, { verbatim: true })).address;
 
     if (isBlockedAddress(address)) {
       throw new UnsupportedFormatError(
@@ -122,36 +117,77 @@ export class SafeHttpClient {
       );
     }
 
-    // Pin the connection to the address we just checked. Without this, a
-    // second DNS lookup between check and connect can return a different answer.
-    const pinned = new URL(url.href);
-    pinned.hostname = isIP(address) === 6 ? `[${address}]` : address;
-
-    return { requestUrl: pinned.href, hostHeader: url.host };
+    return address;
   }
 
-  private async readCapped(response: Response, url: string): Promise<Buffer> {
-    const declared = Number(response.headers.get('content-length') ?? '0');
+  /**
+   * One request, connected to an address we have already checked while still
+   * addressed to the real hostname.
+   *
+   * **This is why it is not `fetch`.** The pin has to affect the *socket* and
+   * nothing else: put the IP in the URL instead and TLS verifies the certificate
+   * against the IP, which fails for every HTTPS host on the internet —
+   * `ERR_TLS_CERT_ALTNAME_INVALID`, or an SNI handshake alert before that. This
+   * client did exactly that, so every https:// source failed with a bare
+   * "fetch failed" and the `urls` input only ever worked over plain http.
+   *
+   * `lookup` is the right seam: Node hands DNS resolution to it, we return the
+   * address already validated, and the URL keeps the hostname — so SNI, the
+   * certificate check and the Host header are all correct, and there is still no
+   * window between the check and the connect for DNS to change its answer.
+   */
+  private send(url: URL, address: string, timeoutMs: number): Promise<IncomingMessage> {
+    const send = url.protocol === 'https:' ? httpsRequest : httpRequest;
+
+    return new Promise((resolve, reject) => {
+      const request = send(url, {
+        method: 'GET',
+        headers: { 'user-agent': 'studycore-generation/0.1 (+https://studycore.example)' },
+        timeout: timeoutMs,
+        // Always the checked address, whatever DNS would say now.
+        lookup: (_hostname, options, callback) => {
+          const family = isIP(address);
+          if (typeof options === 'function') {
+            (options as (e: Error | null, a: string, f: number) => void)(null, address, family);
+            return;
+          }
+          if (options.all) {
+            (callback as unknown as (e: Error | null, a: { address: string; family: number }[]) => void)(
+              null, [{ address, family }],
+            );
+            return;
+          }
+          callback(null, address, family);
+        },
+      }, resolve);
+
+      request.on('timeout', () => {
+        request.destroy(new UnsupportedFormatError(`Timed out fetching '${url.href}'.`, { url: url.href }));
+      });
+      request.on('error', reject);
+      request.end();
+    });
+  }
+
+  private async readCapped(response: IncomingMessage, url: string): Promise<Buffer> {
+    const declared = Number(response.headers['content-length'] ?? '0');
     if (declared > this.options.maxResponseBytes) {
+      response.destroy();
       throw UnsupportedFormatError.overLimit(`response size for '${url}'`, declared, this.options.maxResponseBytes);
     }
 
     // Content-Length is a claim, not a guarantee — cap the actual stream too.
-    const reader = response.body?.getReader();
-    if (!reader) return Buffer.alloc(0);
-
     const chunks: Buffer[] = [];
     let total = 0;
 
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
+    for await (const chunk of Readable.from(response)) {
+      const buffer = Buffer.from(chunk as Buffer);
+      total += buffer.length;
       if (total > this.options.maxResponseBytes) {
-        await reader.cancel();
+        response.destroy();
         throw UnsupportedFormatError.overLimit(`response size for '${url}'`, total, this.options.maxResponseBytes);
       }
-      chunks.push(Buffer.from(value));
+      chunks.push(buffer);
     }
     return Buffer.concat(chunks);
   }

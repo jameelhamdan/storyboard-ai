@@ -1,8 +1,14 @@
 /** Stage weights sum to 100. Render dominates because it does. */
 export const STAGE_WEIGHTS = {
   validate: 1,
-  ingest: 6,
-  transcribe: 8,
+  /**
+   * Off for most jobs, and cheap when on — a search and a page fetch each — but
+   * it gets a real slice because it can *add sources*, and a job that spends a
+   * minute pulling in six pages should not look stalled at 1%.
+   */
+  research: 3,
+  ingest: 5,
+  transcribe: 6,
   consolidate: 5,
   script: 8,
   /**
@@ -33,7 +39,7 @@ export type StageName = keyof typeof STAGE_WEIGHTS;
  * for nothing at all.
  */
 export const STAGE_ORDER: readonly StageName[] = [
-  'validate', 'ingest', 'transcribe', 'consolidate', 'script', 'planReview', 'storyboard',
+  'validate', 'research', 'ingest', 'transcribe', 'consolidate', 'script', 'planReview', 'storyboard',
   'judgeStoryboard', 'synthesize', 'subtitles', 'quiz', 'render', 'assemble', 'publish',
 ];
 

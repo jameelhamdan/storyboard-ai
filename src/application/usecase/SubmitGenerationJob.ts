@@ -174,6 +174,7 @@ export class SubmitGenerationJob {
         images: input.features?.images ?? null,
         imageSources: input.features?.imageSources ?? null,
         planReview: input.features?.planReview ?? null,
+        research: input.features?.research ?? null,
       },
       targetDurationSeconds: input.targetDurationSeconds ?? null,
       studentContext: input.studentContext

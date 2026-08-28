@@ -64,6 +64,7 @@ export function presentStatus(job: VideoJob): Record<string, unknown> {
       // a caller has to reconcile.
       image_sources: s.features.images ? [...s.features.imageSources] : [],
       plan_review: s.features.planReview,
+      research: s.features.research,
     },
     ...(s.cost ? { cost: s.cost } : {}),
     ...(s.quality ? { quality: s.quality } : {}),

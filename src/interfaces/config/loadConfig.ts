@@ -16,7 +16,7 @@ import { Language, type LanguageCode } from '@domain/shared/Language.js';
 import {
   DurationPolicy, SubtitleSegmentationPolicy, JudgeThresholdPolicy,
   RetryBudgetPolicy, CostCeilingPolicy, SourcePrecedencePolicy,
-  ScriptScopingPolicy, PersonalisationPolicy, ImageSourcePolicy,
+  ScriptScopingPolicy, PersonalisationPolicy, ImageSourcePolicy, ResearchPolicy,
 } from '@domain/policy/index.js';
 
 export interface LoadedConfig {
@@ -164,6 +164,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): LoadedConfig {
       }),
       costCeiling: new CostCeilingPolicy(raw.job.costCeilingUsd),
       imageSource: new ImageSourcePolicy(),
+      research: new ResearchPolicy(raw.research),
       sourcePrecedence: new SourcePrecedencePolicy(raw.content.sourcePrecedence),
       scriptScoping: new ScriptScopingPolicy(),
       personalisation: new PersonalisationPolicy(),

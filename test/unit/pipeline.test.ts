@@ -88,7 +88,7 @@ describe('GenerationPipeline', () => {
     job = VideoJob.create({
       outputLanguage: Language.of('en'), voiceSlot: 'en_female_1',
       qualityPreset: preset, style,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       now: new Date(),
     });
   });
@@ -221,7 +221,7 @@ describe('cancellation is not a failure', () => {
     const job = VideoJob.create({
       outputLanguage: Language.of('en'), voiceSlot: 'en_female_1',
       qualityPreset: preset, style,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       now: new Date(),
     });
 
@@ -248,7 +248,7 @@ describe('cost ceiling circuit breaker', () => {
     const job = VideoJob.create({
       outputLanguage: Language.of('en'), voiceSlot: 'en_female_1',
       qualityPreset: preset, style,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       now: new Date(),
     });
 
@@ -280,7 +280,7 @@ describe('cost ceiling circuit breaker', () => {
     const job = VideoJob.create({
       outputLanguage: Language.of('en'), voiceSlot: 'en_female_1',
       qualityPreset: preset, style,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       now: new Date(),
     });
 

@@ -1,4 +1,5 @@
 import type { ImageSourceId } from '../media/ImageSourceId.js';
+import type { ResearchMode } from '../policy/ResearchPolicy.js';
 
 /**
  * The optional halves of the pipeline, per job.
@@ -40,6 +41,21 @@ export interface JobFeatureFlags {
    * is illustrated, and revise it if the judge objects.
    */
   readonly planReview: boolean;
+  /**
+   * Whether to search the web for the topic before writing the script, and how
+   * hard to look.
+   *
+   * A mode rather than a boolean because `deep` is a different bill, not a
+   * stronger setting: it re-enters the search loop asking what the first round
+   * did not answer. Which of the two a job wants is a decision, and a threshold
+   * would be making it for them.
+   *
+   * Off by default everywhere. Searched material is still *material* — it enters
+   * through the same door as an upload and is cited the same way — but a video
+   * built partly from pages the caller never chose is a different promise from
+   * one built only from what they sent.
+   */
+  readonly research: ResearchMode;
 }
 
 export class JobFeatures {
@@ -64,11 +80,13 @@ export class JobFeatures {
       images: requested?.images ?? defaults.images,
       imageSources: requested?.imageSources ?? defaults.imageSources,
       planReview: requested?.planReview ?? defaults.planReview,
+      research: requested?.research ?? defaults.research,
     });
   }
 
   public get images(): boolean { return this.flags.images; }
   public get planReview(): boolean { return this.flags.planReview; }
+  public get research(): ResearchMode { return this.flags.research; }
 
   /**
    * The sources this job may use — empty whenever images are off, so a caller
@@ -84,6 +102,7 @@ export class JobFeatures {
       images: this.flags.images,
       imageSources: [...this.flags.imageSources],
       planReview: this.flags.planReview,
+      research: this.flags.research,
     };
   }
 

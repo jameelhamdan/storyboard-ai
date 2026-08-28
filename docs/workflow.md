@@ -57,11 +57,11 @@ independently testable with a hand-built input.
 
 ---
 
-## 3. The fourteen stages
+## 3. The fifteen stages
 
 ```
-validate → ingest → transcribe → consolidate → script → [plan review] → storyboard → [judge]
-  → synthesize → subtitles → quiz → render → assemble → publish
+validate → [research] → ingest → transcribe → consolidate → script → [plan review]
+  → storyboard → [judge] → synthesize → subtitles → quiz → render → assemble → publish
 ```
 
 **Everything that spends money happens before `render`.** Render is the one stage
@@ -72,25 +72,32 @@ its audio. So a job resumed after a render interruption re-pays for nothing at a
 | # | Stage | Weight | Does |
 |---|---|---|---|
 | 1 | `validate` | 1 | Sniffs magic bytes, enforces source count and size limits. Rejects with `UNSUPPORTED_FORMAT` before anything is read or paid for |
-| 2 | `ingest` | 6 | Runs the matching extractor per source (PDF/DOCX/PPTX/image/audio/web/YouTube). Every chunk carries `{sourceId, page \| timestamp}` — **provenance is attached here or it does not exist later** |
-| 3 | `transcribe` | 8 | Local whisper.cpp over audio sources without text. Student audio never leaves the machine |
-| 4 | `consolidate` | 5 | Merges exact and near-duplicate chunks, resolves conflicts by `SourcePrecedencePolicy`. Slides plus a recording of those slides would otherwise be narrated twice. Throws `INSUFFICIENT_CONTENT` below the thresholds |
-| 5 | `script` | 8 | Quality-tier model writes the narration, then settles the visual plan. `PersonalisationPolicy` folds `student_context`, the chosen `style` and the caller's `direction` into one brief; `DurationPolicy` sets the target length and word budget; `ScriptScopingPolicy` rejects any sentence without a resolvable citation. It also picks each scene's **diagram shape** from a thirteen-value vocabulary — the one decision only this stage can make well, since it has the whole source in front of it. Normalisation runs last, so everything downstream sees one identical spoken form. A failed visual plan is never fatal — it falls back to the theme palette |
-| 6 | `planReview` | 3 | Quality-tier model grades the **whole story before anything is drawn**: coverage of the material, ordering, one idea per scene, whether each scene's chosen shape fits what it says. On an objection the script is rewritten with the critique attached, up to `judge.maxPlanRevisions`. The better plan ships and the video always ships — a plan that never satisfies the judge goes on with its objections logged. Skipped when the request sets `features.plan_review: false` |
-| 7 | `storyboard` | 9 | Volume-tier model *describes* the shape the script chose — nodes, edges, labels and `anchor` phrases, with no coordinates and no CSS — and `render/diagram/` lays it out. A board that overlaps or clips is not something the format can express. Fans out under `concurrency.storyboard` |
-| 8 | `judgeStoryboard` | 8 | Stage A (free markup **and geometry** checks — overlap, clipping and text size measured off the laid-out page) then Stage B (a **quality-tier vision** call on what survives). Per scene: pass, regenerate with the failed gates and the judge's notes, or stop and **ship the best attempt**. Fans out under `concurrency.judge` |
-| 9 | `synthesize` | 13 | TTS per scene under `concurrency.speechSynthesis`, then concatenation and loudness normalisation — and finally the **re-time**, which rebuilds the storyboard timeline from measured audio |
-| 10 | `subtitles` | 1 | Cues from absolute word timings via `SubtitleSegmentationPolicy`, written as SRT. Drift over tolerance is logged loudly — a slightly-off subtitle beats no subtitle |
-| 11 | `quiz` | 1 | 3–7 questions from the *timed* script, so `source_moment_seconds` is exact rather than estimated |
-| 12 | `render` | 28 | Chromium draws frames, ffmpeg encodes segments, fanned out under `concurrency.renderSegments`. Per-segment resume: an already-encoded segment is not redrawn |
-| 13 | `assemble` | 5 | Concatenates segments, muxes the narration track, and muxes the subtitles as a `mov_text` track — soft, not burned in, and marked default |
-| 14 | `publish` | 4 | MP4, SRT, `traceability.json` and `cost.json` to object storage, presigned — then records the final cost and reclaims the workspace |
+| 2 | `research` | 3 | Searches the web for the topic and appends what it finds as ordinary **URL sources** — it reads nothing itself. `web_search` searches once; `deep` searches again for what the first round did not answer, bounded by `ResearchPolicy`. Off unless the request asks for it |
+| 3 | `ingest` | 5 | Runs the matching extractor per source (PDF/DOCX/PPTX/image/audio/web/YouTube). Every chunk carries `{sourceId, page \| timestamp}` — **provenance is attached here or it does not exist later** |
+| 4 | `transcribe` | 6 | Local whisper.cpp over audio sources without text. Student audio never leaves the machine |
+| 5 | `consolidate` | 5 | Merges exact and near-duplicate chunks, resolves conflicts by `SourcePrecedencePolicy`. Slides plus a recording of those slides would otherwise be narrated twice. Throws `INSUFFICIENT_CONTENT` below the thresholds |
+| 6 | `script` | 8 | Quality-tier model writes the narration, then settles the visual plan. `PersonalisationPolicy` folds `student_context`, the chosen `style` and the caller's `direction` into one brief; `DurationPolicy` sets the target length and word budget; `ScriptScopingPolicy` rejects any sentence without a resolvable citation. It also picks each scene's **diagram shape** from a thirteen-value vocabulary — the one decision only this stage can make well, since it has the whole source in front of it. Normalisation runs last, so everything downstream sees one identical spoken form. A failed visual plan is never fatal — it falls back to the theme palette |
+| 7 | `planReview` | 3 | Quality-tier model grades the **whole story before anything is drawn**: coverage of the material, ordering, one idea per scene, whether each scene's chosen shape fits what it says. On an objection the script is rewritten with the critique attached, up to `judge.maxPlanRevisions`. The better plan ships and the video always ships — a plan that never satisfies the judge goes on with its objections logged. Skipped when the request sets `features.plan_review: false` |
+| 8 | `storyboard` | 9 | Volume-tier model *describes* the shape the script chose — nodes, edges, labels and `anchor` phrases, with no coordinates and no CSS — and `render/diagram/` lays it out. A board that overlaps or clips is not something the format can express. Fans out under `concurrency.storyboard` |
+| 9 | `judgeStoryboard` | 8 | Stage A (free markup **and geometry** checks — overlap, clipping and text size measured off the laid-out page) then Stage B (a **quality-tier vision** call on what survives). Per scene: pass, regenerate with the failed gates and the judge's notes, or stop and **ship the best attempt**. Fans out under `concurrency.judge` |
+| 10 | `synthesize` | 13 | TTS per scene under `concurrency.speechSynthesis`, then concatenation and loudness normalisation — and finally the **re-time**, which rebuilds the storyboard timeline from measured audio |
+| 11 | `subtitles` | 1 | Cues from absolute word timings via `SubtitleSegmentationPolicy`, written as SRT. Drift over tolerance is logged loudly — a slightly-off subtitle beats no subtitle |
+| 12 | `quiz` | 1 | 3–7 questions from the *timed* script, so `source_moment_seconds` is exact rather than estimated |
+| 13 | `render` | 28 | Chromium draws frames, ffmpeg encodes segments, fanned out under `concurrency.renderSegments`. Per-segment resume: an already-encoded segment is not redrawn |
+| 14 | `assemble` | 5 | Concatenates segments, muxes the narration track, and muxes the subtitles as a `mov_text` track — soft, not burned in, and marked default |
+| 15 | `publish` | 4 | MP4, SRT, `traceability.json` and `cost.json` to object storage, presigned — then records the final cost and reclaims the workspace |
 
 Weights sum to 100 and are the progress scale — `StageName.ts` throws at import time if they stop
 summing to 100, because the reported percentage would otherwise silently stop meaning what the API
 contract says it means. Render dominates because it does.
 
-### Three ordering decisions worth knowing
+### Four ordering decisions worth knowing
+
+**Research produces sources, not answers.** It sits before `ingest` and hands it URLs, so the pages
+are fetched through the SSRF guard, chunked with provenance and cited exactly like an uploaded PDF.
+The alternative — asking a model what it knows and writing that into the script — produces a video
+whose claims have no source, which is the one thing FR-9 exists to prevent.
+
 
 **The story is judged before it is drawn.** Every other judge in this pipeline grades *execution* —
 whether one board is legible, grounded and well composed. None of them can ask whether the video

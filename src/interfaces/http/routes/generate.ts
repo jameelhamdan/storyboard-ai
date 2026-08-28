@@ -98,6 +98,9 @@ export async function registerGenerateRoute(
                 ...(parsed.features.plan_review !== undefined
                   ? { planReview: parsed.features.plan_review }
                   : {}),
+                ...(parsed.features.research !== undefined
+                  ? { research: parsed.features.research }
+                  : {}),
               },
             }
           : {}),

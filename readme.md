@@ -47,7 +47,7 @@ docker compose up --scale worker=4
 ## What works today, and what does not
 
 The build follows the milestone order in `plan.md` §10. **M2 is complete**: the whole
-API surface, queueing, the fourteen-stage pipeline, checkpointing, Docker, and real
+API surface, queueing, the fifteen-stage pipeline, checkpointing, Docker, and real
 video output. The stages that need a model provider are stubbed behind their ports.
 
 | Area | Status |
@@ -69,6 +69,7 @@ video output. The stages that need a model provider are stubbed behind their por
 | Whiteboard aesthetic | ✅ real — every scene is a diagram (one of thirteen shapes), HTML/CSS for text and SVG for strokes, enforced by a pre-render gate |
 | Story plan review before illustration | ✅ real — the scene set, order and per-scene shape are judged and revised before a board exists |
 | Found images on a board | ✅ real — Wikimedia Commons, Unsplash, Pexels; inlined, credited, selectable per request |
+| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default |
 | Generated whiteboard illustrations | ✅ real — a found reference redrawn in the theme's palette by `gemini-3-pro-image`, credited as AI-generated |
 | Visual plan + vision judge | ✅ real — palette chosen per video, scenes judged from screenshots |
 

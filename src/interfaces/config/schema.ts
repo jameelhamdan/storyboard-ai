@@ -76,6 +76,12 @@ export const defaultConfigSchema = z.object({
     images: z.boolean(),
     imageSources: z.array(z.enum(IMAGE_SOURCE_IDS)),
     planReview: z.boolean(),
+    research: z.enum(['none', 'web_search', 'deep']),
+  }),
+  research: z.object({
+    maxRounds: z.number().int().positive(),
+    queriesPerRound: z.number().int().positive(),
+    maxSources: z.number().int().positive(),
   }),
   concurrency: z.object({
     storyboard: positive,
@@ -273,6 +279,17 @@ export const envSchema = z.object({
    * need a credential of their own, which *is* the decision; this one does not.
    */
   IMAGE_GENERATION: z.coerce.boolean().default(false),
+  /**
+   * Web search, for research and for the `web_search` image source.
+   *
+   * `gemini` needs no new credential — it uses the `google_search` tool on
+   * GEMINI_API_KEY — but it can only answer *research*: grounding returns pages,
+   * never images. `brave` answers both, and is what a deployment wanting
+   * `web_search` on a board needs.
+   */
+  WEB_SEARCH_DRIVER: z.enum(['none', 'gemini', 'brave']).default('none'),
+  BRAVE_API_KEY: z.string().optional(),
+  WEB_SEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   GEMINI_IMAGE_MODEL: z.string().default('gemini-3-pro-image'),
   /** Generation is slower than a search by an order of magnitude. */
   IMAGE_GENERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),

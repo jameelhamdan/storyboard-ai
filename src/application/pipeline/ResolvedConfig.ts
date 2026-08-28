@@ -4,6 +4,7 @@ import type { Theme } from '@domain/media/Theme.js';
 import type { VideoStyle } from '@domain/media/VideoStyle.js';
 import type { JobFeatureFlags } from '@domain/job/JobFeatures.js';
 import type { ImageSourcePolicy } from '@domain/policy/ImageSourcePolicy.js';
+import type { ResearchPolicy } from '@domain/policy/ResearchPolicy.js';
 import type { SourceKind } from '@domain/content/ContentChunk.js';
 import type { LanguageCode } from '@domain/shared/Language.js';
 import type {
@@ -111,6 +112,8 @@ export interface ResolvedConfig {
     readonly sourcePrecedence: SourcePrecedencePolicy;
     /** Which image library answers which kind of question, and in what order. */
     readonly imageSource: ImageSourcePolicy;
+    /** How much of the open web a researching job may pull in. */
+    readonly research: ResearchPolicy;
     readonly scriptScoping: ScriptScopingPolicy;
     readonly personalisation: PersonalisationPolicy;
   };

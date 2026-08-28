@@ -1,4 +1,5 @@
 export { ValidateInputsStage } from './ValidateInputsStage.js';
+export { ResearchTopicStage } from './ResearchTopicStage.js';
 export { IngestSourcesStage } from './IngestSourcesStage.js';
 export { TranscribeAudioStage } from './TranscribeAudioStage.js';
 export { ConsolidateContentStage } from './ConsolidateContentStage.js';

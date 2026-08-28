@@ -93,7 +93,7 @@ A stage that starts making a judgement call rather than orchestrating one belong
 
 ## 3. Ports and adapters
 
-`application/port/` holds 21 interfaces. Each has at least one real adapter in `infrastructure/`,
+`application/port/` holds 23 interfaces. Each has at least one real adapter in `infrastructure/`,
 and the model-facing ones also have a stub.
 
 | Port | Real adapter | Stub |
@@ -106,6 +106,7 @@ and the model-facing ones also have a stub.
 | `StoryPlanJudgePort` | `PromptedStoryPlanJudge` | `StubStoryPlanJudge` |
 | `ImageSourcePort` | `WikimediaImageSource`, `UnsplashImageSource`, `PexelsImageSource`, `GeneratedImageSource` — one per provenance, resolved by id through `ImageSourceRegistry` | — |
 | `ImageGeneratorPort` | `GeminiImageGenerator` | — |
+| `WebSearchPort` | `GeminiGroundedSearch` (no extra credential), `BraveWebSearch` | — |
 | `IllustrationFinderPort` | `CompositeImageSource` — asks the permitted sources in the order `ImageSourcePolicy` gives | — (absent when no key is configured) |
 | `SpeechSynthesisPort` | `OpenAiSpeechSynthesizer`, `ElevenLabsSpeechSynthesizer`, `GeminiSpeechSynthesizer` | `StubSpeechSynthesizer` |
 | `TranscriptionPort` | `WhisperCliTranscriber` | `StubTranscriber` |
@@ -199,6 +200,13 @@ It is *shared* rather than local because BullMQ requeues a dead worker's job to 
 checkpoint in one container's `/tmp` does not exist in the next. Locally that is a compose named
 volume. A hosted deployment needs an adapter whose `localCopy` genuinely copies, so ffmpeg and
 Playwright still get real paths — that is the one method the port exists to abstract.
+
+**`SafeHttpClient` — every caller-supplied URL, and now every researched one.**
+It resolves the hostname, checks the address against the private/link-local/metadata ranges, then
+pins the connection to *that address* while leaving the URL addressed to the hostname — so TLS
+verification, SNI and the `Host` header are all correct and there is still no window for DNS to
+change its answer between the check and the connect. Pinning by rewriting the URL to the IP, which is
+the obvious implementation, fails certificate validation on every HTTPS host on the internet.
 
 **`ObjectStoragePort` — published, durable, presigned.** The four artifacts the caller receives:
 `video.mp4`, `subtitles.srt`, `traceability.json`, `cost.json`. These outlive Redis job state, which

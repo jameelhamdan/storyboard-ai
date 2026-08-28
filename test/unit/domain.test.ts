@@ -30,7 +30,7 @@ const newJob = () => VideoJob.create({
   voiceSlot: 'en_female_1',
   qualityPreset: preset,
   style,
-  features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+  features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
   now: new Date(),
 });
 
@@ -96,7 +96,7 @@ describe('VideoJob state machine', () => {
     job.start(new Date());
     const restored = VideoJob.rehydrate({
       snapshot: job.toSnapshot(), qualityPreset: preset, style, direction: undefined,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       studentContext: job.studentContext, cost: null, verdict: null, quiz: [],
     });
     expect(restored.id.value).toBe(job.id.value);
@@ -296,7 +296,7 @@ describe('generation time', () => {
     const wire = JSON.parse(JSON.stringify(job.toSnapshot()));
     const restored = VideoJob.rehydrate({
       snapshot: wire, qualityPreset: preset, style, direction: undefined,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       studentContext: job.studentContext, cost: null, verdict: null, quiz: [],
     });
     expect(restored.generationSeconds).toBe(45);
@@ -328,7 +328,7 @@ describe('cost and quality survive persistence', () => {
     const wire = JSON.parse(JSON.stringify(job.toSnapshot()));
     const restored = VideoJob.rehydrate({
       snapshot: wire, qualityPreset: preset, style, direction: undefined,
-      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }),
+      features: JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }),
       studentContext: job.studentContext, cost: null, verdict: null, quiz: [],
     });
 

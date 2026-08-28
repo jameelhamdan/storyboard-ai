@@ -100,6 +100,20 @@ features:
   # judgement about the material, not a preference.
   imageSources:           [wikimedia, unsplash, pexels, web_search, generated]
   planReview:             true
+  # Off by default, and deliberately. Searched material is still material — it
+  # is fetched, chunked and cited exactly like an upload — but a video built
+  # partly from pages the caller never chose is a different promise from one
+  # built only from what they sent. A request opts in per job.
+  research:               none
+
+# What a researching job may pull in. These bound grounding, not cost: a video
+# built from thirty web pages is not better researched than one built from six,
+# it is a video whose citations nobody will check. Six good pages is a reading
+# list; thirty is a search results page.
+research:
+  maxRounds:              2       # only `deep` uses more than the first
+  queriesPerRound:        3
+  maxSources:             6
 
 # Per-stage fan-out caps. These are provider rate limiting as much as they are
 # throughput: the account this was measured on allows 30,000 tokens per minute

@@ -166,7 +166,7 @@ describe('ReviewStoryPlanStage', () => {
     const original = scriptSaying('Glucose is split into pyruvate.');
     const result = await stage.execute(
       inputWith(original),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true })),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' })),
     );
 
     expect(result.script).toBe(original);
@@ -181,7 +181,7 @@ describe('ReviewStoryPlanStage', () => {
     const original = scriptSaying('Glucose is split into pyruvate.');
     const result = await stage.execute(
       inputWith(original),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: false })),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: false, research: 'none' })),
     );
 
     expect(result.script).toBe(original);
@@ -196,7 +196,7 @@ describe('ReviewStoryPlanStage', () => {
 
     const result = await stage.execute(
       inputWith(scriptSaying('Glucose is split into pyruvate.')),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true })),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' })),
     );
 
     expect(generator.notes[0]).toEqual(['coverage: nothing covers photosynthesis']);
@@ -220,7 +220,7 @@ describe('ReviewStoryPlanStage', () => {
 
     const result = await stage.execute(
       inputWith(scriptSaying('Glucose is split into pyruvate.')),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true })),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' })),
     );
 
     expect(result.script.scenes[0]?.writtenText).toBe('Glucose is split into pyruvate.');
@@ -236,7 +236,7 @@ describe('ReviewStoryPlanStage', () => {
 
     const result = await stage.execute(
       inputWith(scriptSaying('Glucose is split into pyruvate.')),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true })),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' })),
     );
 
     expect(result.script.scenes).toHaveLength(1);
@@ -250,7 +250,7 @@ describe('ReviewStoryPlanStage', () => {
 
     await stage.execute(
       inputWith(scriptSaying('Glucose is split into pyruvate.')),
-      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true }), 2),
+      await contextFor(JobFeatures.of({ images: true, imageSources: ['wikimedia'], planReview: true, research: 'none' }), 2),
     );
 
     expect(generator.notes).toHaveLength(2);

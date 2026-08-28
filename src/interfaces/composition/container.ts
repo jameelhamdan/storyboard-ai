@@ -10,7 +10,8 @@ import { GetJobStatus } from '@application/usecase/GetJobStatus.js';
 import { CancelJob } from '@application/usecase/CancelJob.js';
 import { ProcessGenerationJob } from '@application/usecase/ProcessGenerationJob.js';
 import {
-  ValidateInputsStage, IngestSourcesStage, TranscribeAudioStage, ConsolidateContentStage,
+  ValidateInputsStage, ResearchTopicStage, IngestSourcesStage, TranscribeAudioStage,
+  ConsolidateContentStage,
   GenerateScriptStage, ReviewStoryPlanStage, ScriptAssembler,
   BuildStoryboardStage, JudgeStoryboardStage, SynthesizeSpeechStage,
   GenerateSubtitlesStage, GenerateQuizStage, RenderFramesStage, AssembleVideoStage,
@@ -75,6 +76,10 @@ import { CompositeImageSource } from '@infrastructure/image/CompositeImageSource
 import { ImageSourceRegistry } from '@infrastructure/image/ImageSourceRegistry.js';
 import { GeneratedImageSource } from '@infrastructure/image/GeneratedImageSource.js';
 import { GeminiImageGenerator } from '@infrastructure/image/GeminiImageGenerator.js';
+import { WebSearchImageSource } from '@infrastructure/image/WebSearchImageSource.js';
+import type { WebSearchPort } from '@application/port/WebSearchPort.js';
+import { BraveSearchClient, BraveWebSearch } from '@infrastructure/search/BraveSearchClient.js';
+import { GeminiGroundedSearch } from '@infrastructure/search/GeminiGroundedSearch.js';
 import type { Theme } from '@domain/media/Theme.js';
 import { UnsplashImageSource } from '@infrastructure/image/UnsplashImageSource.js';
 import { PexelsImageSource } from '@infrastructure/image/PexelsImageSource.js';
@@ -192,7 +197,7 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     // Named even when nothing draws: "images: none" is the answer to "why is
     // every board a photograph", and a blank would not be.
     images: env.IMAGE_GENERATION && env.GEMINI_API_KEY ? env.GEMINI_IMAGE_MODEL : 'none',
-    search: 'none',
+    search: env.WEB_SEARCH_DRIVER,
   } as const;
 
   /**
@@ -308,6 +313,27 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     }));
   }
 
+  /**
+   * Web search serves two unrelated callers — research and the `web_search`
+   * image source — from one credential, so it is built once here.
+   *
+   * Only Brave can answer both: Gemini's grounding returns pages and never
+   * images, which is why an image source is created for one driver and not the
+   * other rather than for "whenever search is on".
+   */
+  const brave = env.WEB_SEARCH_DRIVER === 'brave'
+    ? new BraveSearchClient({
+        apiKey: requireEnv(env.BRAVE_API_KEY, 'BRAVE_API_KEY'),
+        requestTimeoutMs: env.WEB_SEARCH_TIMEOUT_MS,
+      })
+    : undefined;
+
+  if (brave) {
+    searchRegistry.register('web_search', new WebSearchImageSource(brave, {
+      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+    }));
+  }
+
   const imageRegistry = new ImageSourceRegistry();
   for (const id of searchRegistry.registered) {
     imageRegistry.register(id, searchRegistry.resolve(id)!);
@@ -343,6 +369,18 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
   const images: IllustrationFinderPort | undefined = imageRegistry.isEmpty
     ? undefined
     : new CompositeImageSource(imageRegistry, resolved.policies.imageSource, logger);
+
+  const webSearch: WebSearchPort | undefined = brave
+    ? new BraveWebSearch(brave)
+    : env.WEB_SEARCH_DRIVER === 'gemini'
+      ? new GeminiGroundedSearch({
+          apiKey: requireEnv(env.GEMINI_API_KEY, 'GEMINI_API_KEY'),
+          // The volume tier: this call plans searches and returns URLs, and its
+          // output is checked by whether the pages exist.
+          model: env.GEMINI_MODEL_VOLUME,
+          requestTimeoutMs: env.WEB_SEARCH_TIMEOUT_MS,
+        }, logger)
+      : undefined;
 
   const llm: LlmClientPort | undefined = env.LLM_DRIVER === 'openai'
     ? new OpenAiClient({
@@ -460,6 +498,13 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
 
   const stages: AnyStage[] = [
     new ValidateInputsStage(new MagicByteSniffer()),
+    /**
+     * Between validation and ingestion, because it produces *sources* and
+     * everything downstream is indifferent to where a source came from. With no
+     * search driver there is nothing to research with, so the stage is left out
+     * entirely rather than being present and inert.
+     */
+    ...(webSearch && llm ? [new ResearchTopicStage(webSearch, llm)] : []),
     new IngestSourcesStage(extractors),
     new TranscribeAudioStage(transcriber),
     new ConsolidateContentStage(embedder),
@@ -495,6 +540,7 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     // Named rather than a boolean: "images: none" is the answer to "why is
     // every board a drawing", and it is otherwise invisible.
     images: images ? images.available.join('+') : 'none',
+    search: env.WEB_SEARCH_DRIVER,
     prompts: env.PROMPT_DIR,
     extractors: extractors.registered,
   }, 'adapters bound');

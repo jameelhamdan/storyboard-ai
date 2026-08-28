@@ -51,6 +51,12 @@ export const generateRequestSchema = z.object({
     image_sources: z.array(z.enum(IMAGE_SOURCE_IDS)).max(IMAGE_SOURCE_IDS.length).optional(),
     /** Judge the whole story before illustrating it, and revise it if rejected. */
     plan_review: z.boolean().optional(),
+    /**
+     * Search the web for the topic and ingest what it finds as ordinary
+     * sources — cited exactly like an upload. `deep` searches again for what
+     * the first round did not answer.
+     */
+    research: z.enum(['none', 'web_search', 'deep']).optional(),
   }).strict().optional(),
   voice: z.string().optional(),
   target_duration_seconds: z.number().int().min(30).max(600).optional(),
@@ -121,6 +127,7 @@ export const statusResponseSchema = z.object({
     images: z.boolean(),
     image_sources: z.array(z.string()),
     plan_review: z.boolean(),
+    research: z.string(),
   }).optional(),
 
   cost: costSchema.optional(),
