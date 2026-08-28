@@ -94,6 +94,8 @@ export interface ResolvedConfig {
    * this says — see JobFeatures.
    */
   readonly featureDefaults: JobFeatureFlags;
+  /** Keep every intermediate for inspection, and do not reclaim the workspace. */
+  readonly keepRunArtifacts: boolean;
   readonly storage: StorageSettings;
   readonly wordsPerMinute: Readonly<Record<string, number>>;
   readonly subtitleMaxDriftMs: number;

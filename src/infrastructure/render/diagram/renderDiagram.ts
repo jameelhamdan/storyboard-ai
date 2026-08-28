@@ -296,11 +296,32 @@ const PLATES: Record<DiagramShape, Plate> = {
 
     return [
       `    <figure class="sc-figure${d.image.isPortrait ? ' sc-figure-portrait' : ''}">`,
-      // No `data-on`: the picture is the board, so it is there from the first
-      // frame and the callouts arrive on top of it. Anchoring the image itself
-      // would leave the scene empty while the narration talked about it.
-      `      <img class="sc-photo" id="${id.decoration}" ` +
-        `src="${d.image.dataUri}" alt="${escapeHtml(d.image.alt)}">`,
+      /**
+       * Drawn where it can be, shown where it cannot.
+       *
+       * Traced strokes get the same treatment as every other line on the board:
+       * `pathLength="1"` plus a reveal time advances the stroke along its own
+       * geometry, so the picture is *written* rather than switched on. The
+       * strokes are siblings, so the existing stagger draws them in sequence
+       * with no new machinery and no new timing model.
+       *
+       * A photograph has no strokes and takes the `data-on`-less default:
+       * present from the first frame, with the callouts arriving over it.
+       * Anchoring the picture itself would leave the scene empty while the
+       * narration talked about it.
+       */
+      ...(d.image.tracing
+        ? [
+            `      <svg class="sc-trace" viewBox="${d.image.tracing.viewBox}" ` +
+              `preserveAspectRatio="xMidYMid meet" aria-label="${escapeHtml(d.image.alt)}">`,
+            ...d.image.tracing.paths.map((path, i) =>
+              `        <path id="${id.decoration}-t${i}" d="${path}" pathLength="1"/>`),
+            `      </svg>`,
+          ]
+        : [
+            `      <img class="sc-photo" id="${id.decoration}" ` +
+              `src="${d.image.dataUri}" alt="${escapeHtml(d.image.alt)}">`,
+          ]),
       ...(d.nodes.length > 0
         ? [`      <ul class="sc-callouts">`, callouts, `      </ul>`]
         : []),

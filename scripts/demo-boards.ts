@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { SceneDiagram, type ImageBrief } from '@domain/script/SceneDiagram.js';
 import { SceneImage } from '@domain/media/SceneImage.js';
+import { traceContours } from '@infrastructure/render/diagram/traceContours.js';
 
 /**
  * One board per shape, so a render shows the whole vocabulary.
@@ -46,23 +47,39 @@ export async function demoDiagram(spec: DemoBoard, index = 0): Promise<SceneDiag
   if (!diagram.imageBrief) return diagram;
   void index;
 
-  const bytes = await sharp({
-    create: { width: 960, height: 640, channels: 3, background: { r: 205, g: 203, b: 196 } },
-  }).webp({ quality: 80 }).toBuffer();
+  /**
+   * A drawing rather than a flat field, because the illustration plate has two
+   * modes and a flat field only exercises one: line art is traced into strokes
+   * and shown as SVG, a photograph is shown as an image. A grey rectangle traces
+   * into nothing, so the demo would silently only ever cover the photograph
+   * path — including in the browser-backed layout test.
+   */
+  const drawing = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640">'
+    + '<rect width="960" height="640" fill="#faf8f4"/>'
+    + '<circle cx="480" cy="300" r="180" fill="none" stroke="#22201c" stroke-width="9"/>'
+    + '<rect x="270" y="120" width="420" height="360" rx="40" fill="none" stroke="#22201c" stroke-width="9"/>'
+    + '<path d="M320 480 L640 480" fill="none" stroke="#22201c" stroke-width="9"/>'
+    + '</svg>',
+  );
+  const bytes = await sharp(drawing).webp({ quality: 80 }).toBuffer();
 
-  return diagram.withImage(SceneImage.of({
+  const image = SceneImage.of({
     dataUri: `data:image/webp;base64,${bytes.toString('base64')}`,
     alt: diagram.imageBrief.alt,
     attribution: {
-      author: 'Placeholder',
-      sourceName: 'Wikimedia Commons',
-      sourceUrl: 'https://commons.wikimedia.org',
-      licence: 'CC BY-SA 4.0',
+      author: 'Generated',
+      sourceName: 'a demo image model',
+      sourceUrl: '',
+      licence: 'AI-generated',
     },
     width: 960,
     height: 640,
-    source: 'wikimedia',
-  }));
+    source: 'generated',
+  });
+
+  const tracing = await traceContours({ bytes });
+  return diagram.withImage(tracing ? image.withTracing(tracing) : image);
 }
 
 export const DEMOS: DemoBoard[] = [

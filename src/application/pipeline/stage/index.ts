@@ -14,4 +14,5 @@ export { GenerateQuizStage } from './GenerateQuizStage.js';
 export { RenderFramesStage } from './RenderFramesStage.js';
 export { AssembleVideoStage } from './AssembleVideoStage.js';
 export { PublishArtifactsStage } from './PublishArtifactsStage.js';
+export { RunArtifacts } from './RunArtifacts.js';
 export * from './types.js';

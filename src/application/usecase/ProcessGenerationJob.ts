@@ -158,7 +158,13 @@ export class ProcessGenerationJob {
       target.recordCost(cost);
 
       await this.repository.save(target);
-      await this.workspace.discard(job.id);
+      /**
+       * Reclaiming the workspace is what makes the saved run artifacts
+       * pointless: they live in it. So a deployment that asked to keep them
+       * keeps the whole working set, and the orphan sweeper is the only thing
+       * that will ever take it.
+       */
+      if (!this.config.keepRunArtifacts) await this.workspace.discard(job.id);
       return;
     }
 

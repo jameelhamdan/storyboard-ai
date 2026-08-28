@@ -3,6 +3,7 @@ import type { PipelineContext } from '../PipelineContext.js';
 import type { StageName } from '../StageName.js';
 import type { ObjectStoragePort } from '../../port/ObjectStoragePort.js';
 import type { AssembledVideo, FinalisedJob } from './types.js';
+import { RunArtifacts } from './RunArtifacts.js';
 
 /**
  * MP4 + SRT + traceability.json + cost.json to object storage, presigned — and
@@ -23,9 +24,20 @@ import type { AssembledVideo, FinalisedJob } from './types.js';
 export class PublishArtifactsStage implements PipelineStage<AssembledVideo, FinalisedJob> {
   public readonly name: StageName = 'publish';
 
-  constructor(private readonly storage: ObjectStoragePort) {}
+  constructor(
+    private readonly storage: ObjectStoragePort,
+    /**
+     * Off in production. When on, the run's intermediates are reorganised per
+     * scene and the workspace is kept — see `RunArtifacts`.
+     */
+    private readonly runArtifacts: RunArtifacts = new RunArtifacts(false),
+  ) {}
 
   public async execute(input: AssembledVideo, ctx: PipelineContext): Promise<FinalisedJob> {
+    // Before publishing rather than after: this reads the workspace, and
+    // publishing is the step that makes the workspace collectable.
+    await this.runArtifacts.write(input, ctx);
+
     const prefix = `${ctx.config.storage.prefix}${ctx.job.id.value}`;
     const ttl = ctx.config.storage.presignTtlSeconds;
 

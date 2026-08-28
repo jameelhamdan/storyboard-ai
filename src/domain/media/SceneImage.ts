@@ -1,4 +1,5 @@
 import type { ImageSourceId } from './ImageSourceId.js';
+import type { TracedArtwork } from './TracedArtwork.js';
 
 /**
  * How the image is licensed, in the terms the credit line has to satisfy.
@@ -48,6 +49,16 @@ export class SceneImage {
      * inferring that from a display string would be guessing.
      */
     public readonly source: ImageSourceId,
+    /**
+     * The strokes that draw this picture, when it is the kind of picture that
+     * can be drawn.
+     *
+     * Present on generated line art and absent on photographs, which trace into
+     * a few hundred meaningless fragments. When it is here the renderer draws
+     * the strokes instead of showing the image, and the board gains the one
+     * property every other element already has: it appears by being drawn.
+     */
+    public readonly tracing: TracedArtwork | undefined,
   ) {}
 
   public static of(input: {
@@ -71,6 +82,20 @@ export class SceneImage {
       input.width,
       input.height,
       input.source,
+      undefined,
+    );
+  }
+
+  /**
+   * The same image with its strokes worked out.
+   *
+   * Separate from `of` for the same reason `SceneDiagram.withImage` is: tracing
+   * is work that can fail and can be skipped, and validation is neither.
+   */
+  public withTracing(tracing: TracedArtwork): SceneImage {
+    return new SceneImage(
+      this.dataUri, this.alt, this.attribution,
+      this.width, this.height, this.source, tracing,
     );
   }
 

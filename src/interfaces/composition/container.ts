@@ -15,7 +15,7 @@ import {
   GenerateScriptStage, ReviewStoryPlanStage, ScriptAssembler,
   BuildStoryboardStage, JudgeStoryboardStage, SynthesizeSpeechStage,
   GenerateSubtitlesStage, GenerateQuizStage, RenderFramesStage, AssembleVideoStage,
-  PublishArtifactsStage,
+  PublishArtifactsStage, RunArtifacts,
 } from '@application/pipeline/stage/index.js';
 import type { ObjectStoragePort } from '@application/port/ObjectStoragePort.js';
 import { JobId } from '@domain/job/JobId.js';
@@ -496,6 +496,13 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
   // same source-scoping and citation checks the original did.
   const assembler = new ScriptAssembler(new NarrationTextNormalizer());
 
+  /**
+   * Kept runs also keep their workspace, so this decides two things and both of
+   * them are read from one flag — a run whose intermediates were saved and whose
+   * working set was then deleted would be a folder of dangling references.
+   */
+  const runArtifacts = new RunArtifacts(resolved.keepRunArtifacts);
+
   const stages: AnyStage[] = [
     new ValidateInputsStage(new MagicByteSniffer()),
     /**
@@ -520,7 +527,7 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     new GenerateQuizStage(quiz),
     new RenderFramesStage(renderer),
     new AssembleVideoStage(encoder),
-    new PublishArtifactsStage(storage),
+    new PublishArtifactsStage(storage, runArtifacts),
   ];
 
   logger.info({

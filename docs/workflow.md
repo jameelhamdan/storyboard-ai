@@ -85,7 +85,7 @@ its audio. So a job resumed after a render interruption re-pays for nothing at a
 | 12 | `quiz` | 1 | 3–7 questions from the *timed* script, so `source_moment_seconds` is exact rather than estimated |
 | 13 | `render` | 28 | Chromium draws frames, ffmpeg encodes segments, fanned out under `concurrency.renderSegments`. Per-segment resume: an already-encoded segment is not redrawn |
 | 14 | `assemble` | 5 | Concatenates segments, muxes the narration track, and muxes the subtitles as a `mov_text` track — soft, not burned in, and marked default |
-| 15 | `publish` | 4 | MP4, SRT, `traceability.json` and `cost.json` to object storage, presigned — then records the final cost and reclaims the workspace |
+| 15 | `publish` | 4 | MP4, SRT, `traceability.json` and `cost.json` to object storage, presigned — then records the final cost and reclaims the workspace. With `workspace.keepRunArtifacts` on it first lays the run out per scene under `13-run/` and the workspace is **not** reclaimed |
 
 Weights sum to 100 and are the progress scale — `StageName.ts` throws at import time if they stop
 summing to 100, because the reported percentage would otherwise silently stop meaning what the API

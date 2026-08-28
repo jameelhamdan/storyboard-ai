@@ -40,6 +40,11 @@ storage:
 workspace:                            # §4 — shared, not local; a requeued job resumes elsewhere
   sharedVolumePath:       /workspace
   orphanSweepAfterSeconds: 3600
+  # Keep every intermediate, reorganised per scene under 13-run/, and do not
+  # reclaim the workspace when the job finishes. For inspecting a run after the
+  # fact — why scene four looks the way it does — not for production, where it
+  # leaves a job's full working set on the shared volume for the sweeper to find.
+  keepRunArtifacts:       false
 
 pacing:
   wordsPerMinute:

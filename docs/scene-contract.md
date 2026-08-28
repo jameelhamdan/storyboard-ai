@@ -193,6 +193,14 @@ out as HTML beside the plate, where they wrap, get measured and meet the legibil
 A generated image is credited as generated, and names the work it was derived from. A failed
 generation ships the reference photograph as found rather than losing the board.
 
+**And then it draws itself.** Generated line art is traced into SVG strokes — contours found once at
+storyboard time, stored in the scene's markup, revealed by the same `pathLength="1"` mechanism as
+every other line on the board. So the picture is *written* rather than switched on, which is the
+whole aesthetic. Tracing happens once and never per frame: every frame stays a pure function of the
+frame number, so a segment re-rendered on another worker is still pixel-identical and resume still
+works. A photograph is never traced — it produces a few hundred meaningless fragments — so it is
+shown as an image, present from the first frame with the callouts arriving over it.
+
 **Failure is a fallback, not a broken board.** If nothing is found the scene falls back to the
 built-in board and the substitution is recorded — an `illustration` plate with no picture would
 render as a credit line under a hole.

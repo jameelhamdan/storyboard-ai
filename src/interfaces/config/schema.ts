@@ -41,6 +41,7 @@ export const defaultConfigSchema = z.object({
   workspace: z.object({
     sharedVolumePath: z.string(),
     orphanSweepAfterSeconds: positive,
+    keepRunArtifacts: z.boolean(),
   }),
   pacing: z.object({ wordsPerMinute: z.record(z.string(), positive) }),
   duration: z.object({

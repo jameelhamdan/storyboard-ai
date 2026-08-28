@@ -139,6 +139,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): LoadedConfig {
     audio: raw.audio,
     judge: raw.judge,
     featureDefaults: raw.features,
+    keepRunArtifacts: raw.workspace.keepRunArtifacts,
     storage: {
       prefix: raw.storage.prefix,
       presignTtlSeconds: raw.storage.presignTtlSeconds,

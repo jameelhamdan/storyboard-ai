@@ -512,6 +512,26 @@ svg [class*=" sc-"] {
 }
 .sc-figure-portrait .sc-photo { max-height: 66vh; }
 
+/* Traced strokes stand in for the picture, so they take the picture's box —
+   including the height cap, which is the one thing that keeps an image from
+   pushing the callouts and the credit line out of frame. The fill:none is not
+   optional: a traced boundary is a closed path, and filled it renders as a
+   silhouette. */
+.sc-trace {
+  width: 100%;
+  max-height: 58vh;
+  overflow: visible;
+}
+.sc-figure-portrait .sc-trace { max-height: 66vh; }
+.sc-trace path {
+  fill: none;
+  stroke: var(--ink-primary);
+  stroke-width: 1.4;
+  stroke-linecap: var(--stroke-linecap, round);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 .sc-callouts { display: flex; flex-direction: column; gap: 0.6rem; list-style: none; padding: 0; margin: 0; }
 .sc-figure-portrait .sc-callouts { align-items: flex-start; }
 .sc-figure:not(.sc-figure-portrait) .sc-callouts { flex-direction: row; flex-wrap: wrap; justify-content: center; }

@@ -4,6 +4,7 @@ import type { SceneImage } from '@domain/media/SceneImage.js';
 import type { ImageSourceId } from '@domain/media/ImageSourceId.js';
 import type { LoggerPort } from '@application/port/LoggerPort.js';
 import { inlineImage } from './inlineImage.js';
+import { traceContours } from '../render/diagram/traceContours.js';
 
 export interface GeneratedImageOptions {
   /**
@@ -61,7 +62,7 @@ export class GeneratedImageSource implements ImageSourcePort {
         ...(query.signal ? { signal: query.signal } : {}),
       });
 
-      return await inlineImage({
+      const image = await inlineImage({
         bytes: drawn.bytes,
         alt: reference?.alt || query.query,
         /**
@@ -83,6 +84,25 @@ export class GeneratedImageSource implements ImageSourcePort {
         },
         source: 'generated',
       });
+
+      /**
+       * Tracing is part of what `generated` *means*, not a separate setting.
+       *
+       * The board's aesthetic is that everything is drawn, and a flat picture is
+       * the one element that would merely appear. Line art traces cleanly into
+       * the strokes that drew it; a photograph does not, which is exactly why
+       * this happens here and not to searched images.
+       *
+       * A failed trace is not a failed board: the picture is already correct and
+       * already paid for, and showing it flat costs the video some character
+       * rather than a scene.
+       */
+      const tracing = await traceContours({ bytes: drawn.bytes }).catch(() => undefined);
+      if (!tracing) {
+        this.logger.debug({ query: query.query }, 'generated art produced no traceable strokes');
+        return image;
+      }
+      return image.withTracing(tracing);
     } catch (error) {
       this.logger.warn(
         { err: error, query: query.query, hadReference: reference !== undefined },
