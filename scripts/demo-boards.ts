@@ -48,11 +48,11 @@ export async function demoDiagram(spec: DemoBoard, index = 0): Promise<SceneDiag
   void index;
 
   /**
-   * A drawing rather than a flat field, because the illustration plate has two
-   * modes and a flat field only exercises one: line art is traced into strokes
-   * and shown as SVG, a photograph is shown as an image. A grey rectangle traces
-   * into nothing, so the demo would silently only ever cover the photograph
-   * path — including in the browser-backed layout test.
+   * Line art rather than a flat field, because the illustration plate has two
+   * modes and a flat field only exercises one: a diagram is traced into strokes
+   * and drawn, a photograph is shown as an image. A grey rectangle traces into
+   * nothing, so the demo would silently only ever cover the photograph path —
+   * including in the browser-backed layout test.
    */
   const drawing = Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640">'
@@ -68,14 +68,14 @@ export async function demoDiagram(spec: DemoBoard, index = 0): Promise<SceneDiag
     dataUri: `data:image/webp;base64,${bytes.toString('base64')}`,
     alt: diagram.imageBrief.alt,
     attribution: {
-      author: 'Generated',
-      sourceName: 'a demo image model',
-      sourceUrl: '',
-      licence: 'AI-generated',
+      author: 'A Demo Contributor',
+      sourceName: 'Wikimedia Commons',
+      sourceUrl: 'https://commons.wikimedia.org',
+      licence: 'CC BY-SA 4.0',
     },
     width: 960,
     height: 640,
-    source: 'generated',
+    source: 'wikimedia',
   });
 
   const tracing = await traceContours({ bytes });

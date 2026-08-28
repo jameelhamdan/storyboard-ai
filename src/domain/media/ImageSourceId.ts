@@ -8,18 +8,17 @@
  * exactly what belongs in the domain. The adapters that talk to those services
  * stay in infrastructure and are resolved by id at the composition root.
  *
- * `generated` is the odd one and is deliberately in the same vocabulary: an
- * AI-drawn illustration is a *different provenance*, credited differently, and a
- * caller who is willing to accept a stock photograph but not a generated image
- * needs a way to say so. Modelling it as a source rather than a flag is what
- * makes that expressible.
+ * **Every entry is a picture that already exists.** This service finds images
+ * and draws diagrams; it does not generate imagery with a model. A board is
+ * either a diagram laid out by the renderer from a described `SceneDiagram`, or
+ * a real photograph or published figure, credited to whoever made it. There is
+ * deliberately no id for a generated image, so there is no way to ask for one.
  */
 export const IMAGE_SOURCE_IDS = [
   'wikimedia',   // published scientific diagrams, freely licensed
   'unsplash',    // photographs
   'pexels',      // photographs, a second library
   'web_search',  // the open web, licence-filtered
-  'generated',   // drawn to order from a reference, credited as AI-generated
 ] as const;
 
 export type ImageSourceId = (typeof IMAGE_SOURCE_IDS)[number];

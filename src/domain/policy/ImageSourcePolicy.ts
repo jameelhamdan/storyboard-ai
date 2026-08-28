@@ -23,19 +23,18 @@ export type ImageKind = 'photo' | 'diagram';
  */
 const AFFINITY: Readonly<Record<ImageKind, readonly ImageSourceId[]>> = Object.freeze({
   /**
-   * Generated art leads for diagrams because a drawn explanation is what the
-   * board wants and the generator can produce exactly the figure the scene
-   * describes. Commons is next: a real published figure beats an invented one
-   * whenever it exists, which is why generation does not simply replace it.
+   * Commons first: a published scientific figure is what a diagram query wants,
+   * and it is the only library that reliably has one. The stock libraries are
+   * behind it because they will happily return a photograph of a laboratory for
+   * "the Krebs cycle", and the open web is behind them because it is the only
+   * source that cannot state a licence.
    */
-  diagram: ['generated', 'wikimedia', 'web_search', 'unsplash', 'pexels'],
+  diagram: ['wikimedia', 'web_search', 'unsplash', 'pexels'],
   /**
-   * Photographs are the opposite: a real photograph of a real thing is the
-   * point, and a generated one is a picture of something that does not exist.
-   * It stays last rather than absent, so a subject the libraries have nothing
-   * for still gets a board.
+   * Photographs are the other way round: the stock libraries are curated for
+   * exactly this and Commons is not.
    */
-  photo: ['unsplash', 'pexels', 'web_search', 'wikimedia', 'generated'],
+  photo: ['unsplash', 'pexels', 'web_search', 'wikimedia'],
 });
 
 export class ImageSourcePolicy {

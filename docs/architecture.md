@@ -93,7 +93,7 @@ A stage that starts making a judgement call rather than orchestrating one belong
 
 ## 3. Ports and adapters
 
-`application/port/` holds 23 interfaces. Each has at least one real adapter in `infrastructure/`,
+`application/port/` holds 22 interfaces. Each has at least one real adapter in `infrastructure/`,
 and the model-facing ones also have a stub.
 
 | Port | Real adapter | Stub |
@@ -104,10 +104,9 @@ and the model-facing ones also have a stub.
 | `VisualPlannerPort` | `PromptedVisualPlanner` | `StubVisualPlanner` |
 | `QualityJudgePort` | `PromptedQualityJudge` | `StubQualityJudge` |
 | `StoryPlanJudgePort` | `PromptedStoryPlanJudge` | `StubStoryPlanJudge` |
-| `ImageSourcePort` | `WikimediaImageSource`, `UnsplashImageSource`, `PexelsImageSource`, `GeneratedImageSource` — one per provenance, resolved by id through `ImageSourceRegistry` | — |
-| `ImageGeneratorPort` | `GeminiImageGenerator` | — |
+| `ImageSourcePort` | `WikimediaImageSource`, `UnsplashImageSource`, `PexelsImageSource`, `WebSearchImageSource` — one per provenance, resolved by id through `ImageSourceRegistry` | — |
 | `WebSearchPort` | `GeminiGroundedSearch` (no extra credential), `BraveWebSearch` | — |
-| `IllustrationFinderPort` | `CompositeImageSource` — asks the permitted sources in the order `ImageSourcePolicy` gives | — (absent when no key is configured) |
+| `IllustrationFinderPort` | `CompositeImageSource` — asks the permitted sources in the order `ImageSourcePolicy` gives — wrapped by `TracingIllustrationFinder`, which draws a found diagram as strokes | — (absent when no key is configured) |
 | `SpeechSynthesisPort` | `OpenAiSpeechSynthesizer`, `ElevenLabsSpeechSynthesizer`, `GeminiSpeechSynthesizer` | `StubSpeechSynthesizer` |
 | `TranscriptionPort` | `WhisperCliTranscriber` | `StubTranscriber` |
 | `SceneRendererPort` / `ScenePreviewPort` | `PlaywrightSceneRenderer` / `PlaywrightScenePreviewer` | — |

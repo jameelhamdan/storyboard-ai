@@ -78,7 +78,7 @@ async function contextFor(
     logger: log as unknown as PipelineContext['logger'],
     costMeter: new CostMeter(DEFAULT_PRICING, {
       llm: 'stub', tts: 'stub', stt: 'stub', rendering: 'ffmpeg',
-      storage: 'local', embeddings: 'stub', images: 'none', search: 'test',
+      storage: 'local', embeddings: 'stub', search: 'test',
     }),
     workspace: new SharedVolumeWorkspace(root),
     signal: new AbortController().signal,

@@ -320,7 +320,6 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
       html: rendered.html,
       anchors: rendered.anchors,
       usage,
-      ...(diagram.image?.isGenerated ? { imagesGenerated: 1 } : {}),
     };
   }
 

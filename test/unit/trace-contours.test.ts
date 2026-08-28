@@ -51,6 +51,27 @@ describe('traceContours', () => {
     expect(await traceContours({ bytes: await blank() })).toBeUndefined();
   });
 
+  /**
+   * A photograph traces into hundreds of fragments of shadow and texture.
+   * Keeping the 48 longest would *hide* that behind a plausible-looking result,
+   * so the count is judged before anything is discarded.
+   */
+  it('refuses an image that is not line art', async () => {
+    const width = 300;
+    const height = 200;
+    const pixels = Buffer.alloc(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        let h = Math.imul(x, 374761393) + Math.imul(y, 668265263);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        pixels[y * width + x] = (h ^ (h >>> 16)) & 255;
+      }
+    }
+    const noise = await sharp(pixels, { raw: { width, height, channels: 1 } }).png().toBuffer();
+
+    expect(await traceContours({ bytes: noise })).toBeUndefined();
+  });
+
   /** Inlined into the markup, so path data is a size that has to stay bounded. */
   it('simplifies enough to inline', async () => {
     const traced = await traceContours({ bytes: await lineArt() });
@@ -77,11 +98,14 @@ describe('a traced illustration renders as strokes rather than as a picture', ()
       dataUri: `data:image/png;base64,${bytes.toString('base64')}`,
       alt: 'a drawing',
       attribution: {
-        author: 'Generated', sourceName: 'a model', sourceUrl: '', licence: 'AI-generated',
+        author: 'A Contributor',
+        sourceName: 'Wikimedia Commons',
+        sourceUrl: 'https://commons.example/File:Diagram.png',
+        licence: 'CC BY-SA 4.0',
       },
       width: 800,
       height: 600,
-      source: 'generated',
+      source: 'wikimedia',
     });
 
     const artwork = traced ? await traceContours({ bytes }) : undefined;
@@ -120,9 +144,13 @@ describe('a traced illustration renders as strokes rather than as a picture', ()
     expect(await boardWith(false)).toContain('<img');
   });
 
+  /**
+   * Tracing draws the picture that was found, so the credit under it is still
+   * owed to whoever made it — drawing it does not make it ours.
+   */
   it('keeps the credit line either way', async () => {
-    expect(await boardWith(true)).toContain('AI-generated');
-    expect(await boardWith(false)).toContain('AI-generated');
+    expect(await boardWith(true)).toContain('A Contributor');
+    expect(await boardWith(false)).toContain('A Contributor');
   });
 
   /** The sanitizer strips silently, so markup it would rewrite must never be emitted. */

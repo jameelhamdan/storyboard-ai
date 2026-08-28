@@ -41,7 +41,7 @@ Returns immediately — generation is asynchronous.
 | Field | Does |
 |---|---|
 | `images` | Allows the `illustration` board: a real photograph or published scientific diagram, found by search, credited under the picture. Off means every board is drawn |
-| `image_sources` | Which libraries may be used, in preference order: `wikimedia`, `unsplash`, `pexels`, `web_search`, `generated`. An unknown value is a `400` |
+| `image_sources` | Which libraries may be used, in preference order: `wikimedia`, `unsplash`, `pexels`, `web_search`. An unknown value is a `400`. Every one of them finds a picture that already exists — this service does not generate imagery |
 | `research` | `none` (default), `web_search`, or `deep`. Searches the web for the topic and ingests the results as ordinary sources — cited exactly like an upload. `deep` searches again for what the first round did not answer |
 | `plan_review` | Judges the whole story — scene set, order, shape per scene — before anything is illustrated, and rewrites the script if the judge objects. Off means the script goes straight to the boards |
 

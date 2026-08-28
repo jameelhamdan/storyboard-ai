@@ -298,7 +298,7 @@ const costMeter = new CostMeter(DEFAULT_PRICING, {
   rendering: 'playwright',
   storage: 'local',
   embeddings: 'stub',
-  images: 'none', search: 'none',
+  search: 'none',
 });
 const started = Date.now();
 

@@ -267,7 +267,6 @@ export class JudgeStoryboardStage implements PipelineStage<StoryboardedContent, 
         signal: ctx.signal,
       });
       ctx.costMeter.recordTokens(this.name, retry.usage);
-      if (retry.imagesGenerated) ctx.costMeter.recordImage(this.name, retry.imagesGenerated);
       scene = scene.withStoryboard(retry.html, SceneTimeline.unresolved(retry.anchors));
       attempt = decision.attempt;
       regenerated += 1;

@@ -70,8 +70,7 @@ video output. The stages that need a model provider are stubbed behind their por
 | Story plan review before illustration | ✅ real — the scene set, order and per-scene shape are judged and revised before a board exists |
 | Found images on a board | ✅ real — Wikimedia Commons, Unsplash, Pexels; inlined, credited, selectable per request |
 | Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default |
-| Generated whiteboard illustrations | ✅ real — a found reference redrawn in the theme's palette by `gemini-3-pro-image`, credited as AI-generated |
-| Generated art draws itself | ✅ real — contours traced once into SVG strokes, revealed like every other drawn line, deterministic per frame |
+| Found diagrams draw themselves | ✅ real — contours traced once into SVG strokes, revealed like every other drawn line, deterministic per frame |
 | Visual plan + vision judge | ✅ real — palette chosen per video, scenes judged from screenshots |
 
 The stubs are deliberately *honest*: where there is genuinely no content, the pipeline
@@ -109,10 +108,12 @@ TTS_DRIVER=openai
 #UNSPLASH_ACCESS_KEY=<your-key>     # photographs
 #PEXELS_API_KEY=<your-key>          # photographs, a second library
 #WIKIMEDIA_IMAGES=true              # published scientific diagrams; no key needed
-#IMAGE_GENERATION=true              # redraw the reference as a whiteboard illustration
 
 # A request picks from those per job:
-#   features.image_sources: ["wikimedia", "generated"]
+#   features.image_sources: ["wikimedia", "unsplash"]
+#
+# Every picture on a board either already exists or is drawn by the renderer.
+# There is no image-generation model in this service.
 
 # Rendering is always Chromium via Playwright, which the worker and e2e images
 # install — so a full run works under docker compose, not on a bare host.

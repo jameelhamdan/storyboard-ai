@@ -2,15 +2,14 @@ import { Money } from '../shared/Money.js';
 
 /** Metadata only, never content — brief §4 is explicit about this. */
 /**
- * `images` is its own line rather than part of `llm`.
- *
- * Generated illustrations are billed per image, not per token, and they are the
- * one cost a caller can remove entirely by choosing different sources — so
- * folding them into the model bill would hide the number that answers "what did
- * the pictures cost me". Searched images cost nothing and record nothing.
+ * `search` is its own line rather than part of `llm`: a grounded search is
+ * billed per *request*, not per token, and research is the one feature that can
+ * quietly issue a dozen of them. Images have no line at all — every picture on a
+ * board is either drawn by the renderer or found in a library that charges
+ * nothing for it.
  */
 export type CostCategory =
-  | 'llm' | 'tts' | 'stt' | 'rendering' | 'storage' | 'embeddings' | 'images' | 'search';
+  | 'llm' | 'tts' | 'stt' | 'rendering' | 'storage' | 'embeddings' | 'search';
 
 export interface CostEntry {
   readonly stage: string;
@@ -63,7 +62,7 @@ export class CostBreakdown {
     const out: Record<CostCategory, Money> = {
       llm: Money.zero(), tts: Money.zero(), stt: Money.zero(),
       rendering: Money.zero(), storage: Money.zero(), embeddings: Money.zero(),
-      images: Money.zero(), search: Money.zero(),
+      search: Money.zero(),
     };
     for (const e of this.entries) out[e.category] = out[e.category].plus(e.amount);
     return out;

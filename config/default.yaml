@@ -103,7 +103,7 @@ features:
   # `ImageSourcePolicy` still routes a diagram query to Commons before a stock
   # library whatever this order says: which source suits which question is a
   # judgement about the material, not a preference.
-  imageSources:           [wikimedia, unsplash, pexels, web_search, generated]
+  imageSources:           [wikimedia, unsplash, pexels, web_search]
   planReview:             true
   # Off by default, and deliberately. Searched material is still material — it
   # is fetched, chunked and cited exactly like an upload — but a video built

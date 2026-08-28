@@ -137,7 +137,7 @@ async function contextFor(features: JobFeatures, maxPlanRevisions = 1): Promise<
     logger,
     costMeter: new CostMeter(DEFAULT_PRICING, {
       llm: 'stub', tts: 'stub', stt: 'stub',
-      rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', images: 'none', search: 'none',
+      rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', search: 'none',
     }),
     workspace: new SharedVolumeWorkspace(root),
     signal: new AbortController().signal,

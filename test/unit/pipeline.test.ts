@@ -61,7 +61,7 @@ const silentHooks: OnStageComplete = () => {};
 
 const TEST_PROVIDERS: ProviderNames = {
   llm: 'stub', tts: 'stub', stt: 'stub',
-  rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', images: 'none', search: 'none',
+  rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', search: 'none',
 };
 
 describe('stage weights', () => {

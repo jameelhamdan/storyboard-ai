@@ -19,8 +19,19 @@ const TRACE_WIDTH = 360;
  */
 const MIN_CONTOUR_POINTS = 24;
 
-/** Enough to draw a whiteboard illustration; far short of enough to draw a photograph. */
+/** Enough to draw a diagram; far short of enough to draw a photograph. */
 const MAX_CONTOURS = 48;
+
+/**
+ * Above this many contours, the image is not line art.
+ *
+ * A published diagram traces into tens of boundaries. A photograph traces into
+ * hundreds of fragments of shadow and texture, and drawing them produces visual
+ * noise that is strictly worse than showing the photograph. Truncating to
+ * `MAX_CONTOURS` would *hide* that by keeping the 48 longest fragments, so the
+ * count is checked before anything is discarded.
+ */
+const NOT_LINE_ART_ABOVE = 150;
 
 /** Douglas–Peucker tolerance, in grid units. Below a pixel is not worth keeping. */
 const SIMPLIFY_TOLERANCE = 0.8;
@@ -37,6 +48,9 @@ interface Point {
  * a photograph traces into a few hundred meaningless fragments, and a blank
  * image into none at all. Both are ordinary answers, and the caller's response
  * to each is the same — show the picture as it is.
+ *
+ * Nothing here invents anything. The contours are the ones already in the
+ * image, so a traced board draws the published figure it credits.
  *
  * **Deterministic by construction.** Fixed working width, a threshold computed
  * from the image's own histogram by Otsu's method, a boundary walk with a fixed
@@ -63,6 +77,12 @@ export async function traceContours(
 
   const contours = walkBoundaries(ink, width, height);
   if (contours.length === 0) return undefined;
+
+  if (contours.length > NOT_LINE_ART_ABOVE) {
+    // A photograph, or a diagram over a photographic background. Either way,
+    // drawing it would be worse than showing it.
+    return undefined;
+  }
 
   const paths = contours
     .sort((a, b) => b.length - a.length)

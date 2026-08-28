@@ -204,16 +204,20 @@ describe('CompositeImageSource', () => {
  */
 describe('ImageSourcePolicy', () => {
   const policy = new ImageSourcePolicy();
-  const all: ImageSourceId[] = ['wikimedia', 'unsplash', 'pexels', 'web_search', 'generated'];
+  const all: ImageSourceId[] = ['wikimedia', 'unsplash', 'pexels', 'web_search'];
 
-  it('leads with drawn sources for a diagram', () => {
-    expect(policy.order('diagram', all).slice(0, 2)).toEqual(['generated', 'wikimedia']);
+  it('leads with the reference library for a diagram', () => {
+    expect(policy.order('diagram', all).slice(0, 2)).toEqual(['wikimedia', 'web_search']);
   });
 
-  it('leads with photographic sources for a photo, and generates only as a last resort', () => {
+  it('leads with the stock libraries for a photo', () => {
+    expect(policy.order('photo', all).slice(0, 2)).toEqual(['unsplash', 'pexels']);
+  });
+
+  /** The open web is the only source that cannot state a licence. */
+  it('puts the open web behind every curated library', () => {
     const order = policy.order('photo', all);
-    expect(order[0]).toBe('unsplash');
-    expect(order[order.length - 1]).toBe('generated');
+    expect(order.indexOf('web_search')).toBeGreaterThan(order.indexOf('pexels'));
   });
 
   it('returns only what was allowed', () => {

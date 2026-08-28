@@ -35,10 +35,6 @@ export class BuildStoryboardStage implements PipelineStage<ScriptedContent, Stor
 
     for (const result of results) {
       ctx.costMeter.recordTokens(this.name, result.usage);
-      // Billed per image rather than per token, so it cannot ride along in the
-      // token usage — and it is the one line of the bill a caller removes by
-      // choosing different sources.
-      if (result.imagesGenerated) ctx.costMeter.recordImage(this.name, result.imagesGenerated);
       generated.set(result.sceneIndex, {
         html: result.html,
         anchors: SceneTimeline.unresolved(result.anchors),

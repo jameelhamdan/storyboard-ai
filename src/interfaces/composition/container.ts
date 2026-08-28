@@ -74,13 +74,11 @@ import { PromptedVisionReader } from '@infrastructure/llm/PromptedVisionReader.j
 import type { IllustrationFinderPort } from '@application/port/ImageSourcePort.js';
 import { CompositeImageSource } from '@infrastructure/image/CompositeImageSource.js';
 import { ImageSourceRegistry } from '@infrastructure/image/ImageSourceRegistry.js';
-import { GeneratedImageSource } from '@infrastructure/image/GeneratedImageSource.js';
-import { GeminiImageGenerator } from '@infrastructure/image/GeminiImageGenerator.js';
 import { WebSearchImageSource } from '@infrastructure/image/WebSearchImageSource.js';
+import { TracingIllustrationFinder } from '@infrastructure/image/TracingIllustrationFinder.js';
 import type { WebSearchPort } from '@application/port/WebSearchPort.js';
 import { BraveSearchClient, BraveWebSearch } from '@infrastructure/search/BraveSearchClient.js';
 import { GeminiGroundedSearch } from '@infrastructure/search/GeminiGroundedSearch.js';
-import type { Theme } from '@domain/media/Theme.js';
 import { UnsplashImageSource } from '@infrastructure/image/UnsplashImageSource.js';
 import { PexelsImageSource } from '@infrastructure/image/PexelsImageSource.js';
 import { WikimediaImageSource } from '@infrastructure/image/WikimediaImageSource.js';
@@ -194,9 +192,6 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     rendering: 'playwright',
     storage: 'local',
     embeddings: 'stub',
-    // Named even when nothing draws: "images: none" is the answer to "why is
-    // every board a photograph", and a blank would not be.
-    images: env.IMAGE_GENERATION && env.GEMINI_API_KEY ? env.GEMINI_IMAGE_MODEL : 'none',
     search: env.WEB_SEARCH_DRIVER,
   } as const;
 
@@ -244,14 +239,8 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
    */
   const alignmentPerAudioHour = aligner?.name === 'openai' ? 0.36 : 0;
 
-  /**
-   * A generated illustration is billed per image, and only when one is drawn —
-   * a searched image costs nothing and records nothing, which is what makes the
-   * `images` line in cost.json answer "what did generating the pictures cost".
-   */
-  const imagePerGeneration = env.IMAGE_GENERATION ? DEFAULT_PRICING.imagePerGeneration : 0;
   const pricing = env.TTS_DRIVER === 'openai'
-    ? { ...DEFAULT_PRICING, ttsPerMillionChars: 15.0, ttsAlignmentPerAudioHour: 0.36, imagePerGeneration }
+    ? { ...DEFAULT_PRICING, ttsPerMillionChars: 15.0, ttsAlignmentPerAudioHour: 0.36 }
     : env.TTS_DRIVER === 'gemini'
       /**
        * Gemini bills TTS per *token*, not per character, so the rate here is
@@ -267,59 +256,18 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
           ...DEFAULT_PRICING,
           ttsPerMillionChars: 18.0,
           ttsAlignmentPerAudioHour: alignmentPerAudioHour,
-          imagePerGeneration,
         }
-      : { ...DEFAULT_PRICING, imagePerGeneration };
+      : DEFAULT_PRICING;
 
   const prompts = new PromptLibrary(env.PROMPT_DIR, env.PROMPT_HOT_RELOAD);
-
-  /**
-   * Image libraries, enabled by their credentials rather than by a driver flag.
-   *
-   * With none of them configured the whole `illustration` shape is withdrawn:
-   * the script stage stops offering it and the illustrator has no source to ask,
-   * so a deployment with no keys behaves exactly as it did before the feature
-   * existed. That is the reason presence-of-key is the switch — there is no
-   * state where the option is offered and cannot be filled.
-   */
-  /**
-   * Two registries, and the reason is that one of the sources consults the
-   * others.
-   *
-   * `searchRegistry` holds the libraries that go and look something up.
-   * `GeneratedImageSource` is built over a finder across *those*, because a
-   * drawing grounded on a real published figure is worth far more than one
-   * invented from a description — and then it is registered alongside them for
-   * the finder the pipeline actually uses. Registering it into the same registry
-   * it searches would make it consult itself.
-   */
-  const searchRegistry = new ImageSourceRegistry();
-  if (env.UNSPLASH_ACCESS_KEY) {
-    searchRegistry.register('unsplash', new UnsplashImageSource({
-      accessKey: env.UNSPLASH_ACCESS_KEY,
-      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
-    }, logger));
-  }
-  if (env.PEXELS_API_KEY) {
-    searchRegistry.register('pexels', new PexelsImageSource({
-      apiKey: env.PEXELS_API_KEY,
-      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
-    }));
-  }
-  if (env.WIKIMEDIA_IMAGES) {
-    searchRegistry.register('wikimedia', new WikimediaImageSource({
-      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
-      userAgent: env.IMAGE_USER_AGENT,
-    }));
-  }
 
   /**
    * Web search serves two unrelated callers — research and the `web_search`
    * image source — from one credential, so it is built once here.
    *
    * Only Brave can answer both: Gemini's grounding returns pages and never
-   * images, which is why an image source is created for one driver and not the
-   * other rather than for "whenever search is on".
+   * images, which is why an image source is registered for one driver and not
+   * the other rather than for "whenever search is on".
    */
   const brave = env.WEB_SEARCH_DRIVER === 'brave'
     ? new BraveSearchClient({
@@ -328,47 +276,54 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
       })
     : undefined;
 
+  /**
+   * The image libraries this deployment can reach, enabled by their credentials
+   * rather than by a driver flag. With none configured the whole `illustration`
+   * shape is withdrawn: the script stage stops offering it and the illustrator
+   * has no source to ask, so a deployment with no keys behaves exactly as it did
+   * before the feature existed.
+   *
+   * Every one of them *finds* a picture that already exists. There is no
+   * generation path and no id for one: a board is either a diagram the renderer
+   * lays out from a described `SceneDiagram`, or a real photograph or published
+   * figure credited to whoever made it.
+   */
+  const imageRegistry = new ImageSourceRegistry();
+  if (env.UNSPLASH_ACCESS_KEY) {
+    imageRegistry.register('unsplash', new UnsplashImageSource({
+      accessKey: env.UNSPLASH_ACCESS_KEY,
+      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+    }, logger));
+  }
+  if (env.PEXELS_API_KEY) {
+    imageRegistry.register('pexels', new PexelsImageSource({
+      apiKey: env.PEXELS_API_KEY,
+      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+    }));
+  }
+  if (env.WIKIMEDIA_IMAGES) {
+    imageRegistry.register('wikimedia', new WikimediaImageSource({
+      requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
+      userAgent: env.IMAGE_USER_AGENT,
+    }));
+  }
   if (brave) {
-    searchRegistry.register('web_search', new WebSearchImageSource(brave, {
+    imageRegistry.register('web_search', new WebSearchImageSource(brave, {
       requestTimeoutMs: env.IMAGE_TIMEOUT_MS,
     }));
   }
 
-  const imageRegistry = new ImageSourceRegistry();
-  for (const id of searchRegistry.registered) {
-    imageRegistry.register(id, searchRegistry.resolve(id)!);
-  }
-
   /**
-   * Generated boards need an image model, and this one is Gemini's — reachable
-   * on the same key as the text models, so a deployment already using
-   * LLM_DRIVER=gemini gets it without a second credential. Presence of the key
-   * is the switch, exactly as it is for every search library.
+   * Found diagrams are drawn stroke by stroke rather than shown flat — see
+   * `TracingIllustrationFinder`. It is measurement of the picture that was
+   * found, not a second picture, so the credit under it stays true.
    */
-  const imageGenerator = env.GEMINI_API_KEY && env.IMAGE_GENERATION
-    ? new GeminiImageGenerator({
-        apiKey: env.GEMINI_API_KEY,
-        model: env.GEMINI_IMAGE_MODEL,
-        requestTimeoutMs: env.IMAGE_GENERATION_TIMEOUT_MS,
-      }, logger)
-    : undefined;
-
-  if (imageGenerator) {
-    imageRegistry.register('generated', new GeneratedImageSource(
-      imageGenerator,
-      // The look every generated board shares, composed from the theme so two
-      // deployments with different themes cannot produce the same drawing.
-      { styleBrief: styleBriefFor(resolved.defaultTheme) },
-      logger,
-      ...(searchRegistry.isEmpty
-        ? []
-        : [new CompositeImageSource(searchRegistry, resolved.policies.imageSource, logger)]),
-    ));
-  }
-
   const images: IllustrationFinderPort | undefined = imageRegistry.isEmpty
     ? undefined
-    : new CompositeImageSource(imageRegistry, resolved.policies.imageSource, logger);
+    : new TracingIllustrationFinder(
+        new CompositeImageSource(imageRegistry, resolved.policies.imageSource, logger),
+        logger,
+      );
 
   const webSearch: WebSearchPort | undefined = brave
     ? new BraveWebSearch(brave)
@@ -587,24 +542,6 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
   };
 }
 
-
-/**
- * The theme, in the words an image model understands.
- *
- * Derived rather than configured: the palette a generated picture is drawn in
- * *is* the theme's palette, and a second copy of it in .env would be one more
- * thing to keep in sync with `config/theme.yaml`.
- */
-function styleBriefFor(theme: Theme): string {
-  const { ink, board, stroke } = theme.tokens;
-  return [
-    'Style: a marker drawing on a whiteboard. Confident hand-drawn strokes,',
-    `roughly ${Math.round(stroke.widthPx)}px wide, with visible line texture and no shading.`,
-    `Draw in ${ink.primary} on a flat ${board.background} background,`,
-    `using ${[ink.accent, ...ink.accents].slice(0, 3).join(' and ')} sparingly for emphasis.`,
-    'No photographic detail, no gradients, no drop shadows, no frame or border.',
-  ].join(' ');
-}
 
 function requireEnv(value: string | undefined, name: string): string {
   if (!value) {

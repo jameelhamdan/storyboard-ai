@@ -182,24 +182,22 @@ new library be a new file plus a registration.
 order, and the job gets the intersection with what the deployment can reach. See
 `docs/api-contract.md`.
 
-**A board can be drawn to order instead of found.** The `generated` source hands the reference image
-to an image model and gets back a line drawing in the theme's palette — so the picture sits *on* a
-hand-drawn board instead of on top of one. The reference is the point: asked for "a diagram of the
-Krebs cycle" with nothing to work from, a model invents a plausible-looking one with invented labels,
-which is the failure this service exists to avoid. Given a published figure to redraw, it is
-restyling something already correct. No text is ever generated into the picture — callouts are laid
-out as HTML beside the plate, where they wrap, get measured and meet the legibility floor.
+**Nothing on a board is generated imagery.** A picture is either drawn by the renderer from a
+described `SceneDiagram`, or it is a real photograph or published figure that already existed and is
+credited to whoever made it. There is no image-generation model in this service and no
+`ImageSourceId` for one, so there is no way to ask for one.
 
-A generated image is credited as generated, and names the work it was derived from. A failed
-generation ships the reference photograph as found rather than losing the board.
-
-**And then it draws itself.** Generated line art is traced into SVG strokes — contours found once at
+**A found diagram draws itself.** Line art is traced into SVG strokes — contours measured once at
 storyboard time, stored in the scene's markup, revealed by the same `pathLength="1"` mechanism as
 every other line on the board. So the picture is *written* rather than switched on, which is the
-whole aesthetic. Tracing happens once and never per frame: every frame stays a pure function of the
-frame number, so a segment re-rendered on another worker is still pixel-identical and resume still
-works. A photograph is never traced — it produces a few hundred meaningless fragments — so it is
-shown as an image, present from the first frame with the callouts arriving over it.
+whole aesthetic. This invents nothing: the contours are the ones already in the image, so what gets
+drawn is the published figure the credit line names.
+
+Tracing happens once and never per frame — every frame stays a pure function of the frame number, so
+a segment re-rendered on another worker is still pixel-identical and resume still works. A photograph
+is never traced: it produces hundreds of fragments of shadow and texture, so a trace that comes back
+looking like that is discarded and the picture is shown as found, present from the first frame with
+the callouts arriving over it.
 
 **Failure is a fallback, not a broken board.** If nothing is found the scene falls back to the
 built-in board and the substitution is recorded — an `illustration` plate with no picture would

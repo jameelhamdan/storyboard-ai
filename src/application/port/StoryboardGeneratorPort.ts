@@ -18,14 +18,6 @@ export interface GeneratedStoryboard {
   readonly html: string;
   readonly anchors: readonly TimelineAnchor[];
   readonly usage: TokenUsage;
-  /**
-   * How many illustrations this board had drawn for it — 0 or 1 today.
-   *
-   * Reported rather than inferred because it is billed per image, and the stage
-   * that holds the cost meter is not the thing that knows whether a picture was
-   * searched for or drawn.
-   */
-  readonly imagesGenerated?: number;
 }
 
 export interface StoryboardGeneratorPort {

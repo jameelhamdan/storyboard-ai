@@ -8,7 +8,7 @@ import { Money } from '@domain/shared/Money.js';
 
 const PROVIDERS: ProviderNames = {
   llm: 'openai', tts: 'elevenlabs', stt: 'whisper',
-  rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', images: 'none', search: 'none',
+  rendering: 'ffmpeg', storage: 'local', embeddings: 'stub', search: 'none',
 };
 
 const entry = (over: Partial<Parameters<CostBreakdown['with']>[0]>) => ({

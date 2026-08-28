@@ -53,10 +53,11 @@ export class SceneImage {
      * The strokes that draw this picture, when it is the kind of picture that
      * can be drawn.
      *
-     * Present on generated line art and absent on photographs, which trace into
-     * a few hundred meaningless fragments. When it is here the renderer draws
-     * the strokes instead of showing the image, and the board gains the one
-     * property every other element already has: it appears by being drawn.
+     * Present on line art — a published diagram, a schematic, a figure — and
+     * absent on photographs, which trace into a few hundred meaningless
+     * fragments. When it is here the renderer draws the strokes instead of
+     * showing the image, and the board gains the one property every other
+     * element already has: it appears by being drawn rather than by appearing.
      */
     public readonly tracing: TracedArtwork | undefined,
   ) {}
@@ -97,11 +98,6 @@ export class SceneImage {
       this.dataUri, this.alt, this.attribution,
       this.width, this.height, this.source, tracing,
     );
-  }
-
-  /** Drawn to order rather than found. Credited differently, and traceable. */
-  public get isGenerated(): boolean {
-    return this.source === 'generated';
   }
 
   /** The credit line as it appears under the picture. */

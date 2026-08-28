@@ -16,8 +16,6 @@ export interface ProviderNames {
   readonly rendering: string;
   readonly storage: string;
   readonly embeddings: string;
-  /** Whichever model draws generated illustrations, or `none`. */
-  readonly images: string;
   /** Whichever engine answers a research query, or `none`. */
   readonly search: string;
 }
@@ -35,8 +33,6 @@ export interface PricingTable {
   readonly sttPerAudioHour: number;
   readonly renderPerCoreHour: number;
   readonly storagePerGbMonth: number;
-  /** USD per generated image. Zero for a deployment that only searches. */
-  readonly imagePerGeneration: number;
   /**
    * USD per web-search query. Grounded search is billed per *request*, not per
    * token, so it cannot ride along in the model's usage — and research is the
@@ -130,20 +126,6 @@ export class CostMeter implements CostMeterPort {
     });
   }
 
-  /**
-   * One generated illustration. Billed per image rather than per token, which
-   * is why it does not go through `recordTokens`.
-   */
-  public recordImage(stage: string, count = 1): void {
-    this.breakdown = this.breakdown.with({
-      stage,
-      category: 'images',
-      provider: this.providers.images,
-      amount: Money.fromUsd(count * this.pricing.imagePerGeneration),
-      units: { images_generated: count },
-    });
-  }
-
   /** Web-search queries, billed per request rather than per token. */
   public recordSearch(stage: string, queries: number): void {
     this.breakdown = this.breakdown.with({
@@ -227,9 +209,6 @@ export const DEFAULT_PRICING: PricingTable = {
   sttPerAudioHour: 0,
   renderPerCoreHour: 0.02,
   storagePerGbMonth: 0.015,
-  // gemini-3-pro-image, per generated image. Overridden per driver in the
-  // composition root; zero when nothing generates.
-  imagePerGeneration: 0.134,
   // Gemini charges grounded prompts per request rather than per query; $35 per
   // thousand is the published rate, and one research round is one request.
   searchPerQuery: 0.035,

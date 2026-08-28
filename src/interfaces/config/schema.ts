@@ -272,15 +272,6 @@ export const envSchema = z.object({
   PEXELS_API_KEY: z.string().optional(),
   WIKIMEDIA_IMAGES: z.coerce.boolean().default(false),
   /**
-   * Generated illustrations, on GEMINI_API_KEY.
-   *
-   * An explicit switch rather than key presence alone, because that key is
-   * already set for the text models on most deployments — so presence would
-   * silently turn on a per-image charge nobody asked for. The other libraries
-   * need a credential of their own, which *is* the decision; this one does not.
-   */
-  IMAGE_GENERATION: z.coerce.boolean().default(false),
-  /**
    * Web search, for research and for the `web_search` image source.
    *
    * `gemini` needs no new credential — it uses the `google_search` tool on
@@ -291,9 +282,6 @@ export const envSchema = z.object({
   WEB_SEARCH_DRIVER: z.enum(['none', 'gemini', 'brave']).default('none'),
   BRAVE_API_KEY: z.string().optional(),
   WEB_SEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
-  GEMINI_IMAGE_MODEL: z.string().default('gemini-3-pro-image'),
-  /** Generation is slower than a search by an order of magnitude. */
-  IMAGE_GENERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   /** Wikimedia's API policy requires a real contact address in the User-Agent. */
   IMAGE_USER_AGENT: z.string().default('StudyCoreGenerationApi/0.1 (+https://github.com/studycore)'),
   IMAGE_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),

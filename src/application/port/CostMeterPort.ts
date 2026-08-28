@@ -21,8 +21,6 @@ export interface CostMeterPort {
   recordStt(stage: string, audioSeconds: number): void;
   recordRender(stage: string, wallSeconds: number): void;
   recordStorage(stage: string, bytes: number): void;
-  /** One generated illustration — billed per image, not per token. */
-  recordImage(stage: string, count?: number): void;
   /** Web-search queries, billed per request rather than per token. */
   recordSearch(stage: string, queries: number): void;
   recordCustom(stage: string, category: CostCategory, amount: Money, units: Record<string, number>): void;
