@@ -1,0 +1,61 @@
+{
+  "name": "studycore-generation-api-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev:api": "tsx watch src/interfaces/http/server.ts",
+    "dev:worker": "tsx watch src/interfaces/worker/worker.ts",
+    "start:api": "node dist/interfaces/http/server.js",
+    "start:worker": "node dist/interfaces/worker/worker.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deadcode": "knip",
+    "verify": "npm run typecheck && npm run lint && npm run deadcode && npm test",
+    "e2e": "tsx e2e/run.ts",
+    "voices": "tsx scripts/voices.ts",
+    "models": "tsx scripts/models.ts",
+    "preflight": "tsx scripts/preflight.ts",
+    "e2e:novoice": "tsx e2e/run.ts --no-voice",
+    "voice:test": "tsx scripts/voice-test.ts",
+    "render:demo": "tsx scripts/render-demo.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/swagger": "^9.4.0",
+    "@fastify/swagger-ui": "^5.2.0",
+    "@mozilla/readability": "^0.5.0",
+    "bullmq": "^5.34.0",
+    "eld": "^1.0.0",
+    "fast-xml-parser": "^4.5.0",
+    "fastify": "^5.2.0",
+    "file-type": "^19.6.0",
+    "ioredis": "^5.4.1",
+    "linkedom": "^0.18.5",
+    "mammoth": "^1.8.0",
+    "pino": "^9.5.0",
+    "playwright-core": "^1.61.1",
+    "sharp": "^0.33.5",
+    "unpdf": "^0.12.1",
+    "yaml": "^2.6.1",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "knip": "^5.30.0",
+    "pino-pretty": "^13.1.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

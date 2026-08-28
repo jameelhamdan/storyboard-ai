@@ -1,0 +1,38 @@
+# Build context hygiene. Without this the 294MB node_modules tree and the .git
+# history are uploaded to the daemon on every build of every image.
+#
+# One caveat: this file is shared by all three Dockerfiles, so anything COPYed
+# by *any* of them must stay out of here — notably config/, prompts/, assets/,
+# src/ and e2e/ (Dockerfile.e2e copies the last one).
+
+# ── Rebuilt inside the image ────────────────────────────────────────────────
+node_modules
+dist
+coverage
+
+# ── Secrets. Compose injects .env at *run* time via env_file, which does not
+#    require it to be in the build context at all. ─────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Local run artifacts. `out` holds generated MP4s and would otherwise grow
+#    the context by megabytes per test run. ──────────────────────────────────
+out
+.workspace
+*.mp4
+*.log
+
+# ── Repo furniture with no place in a runtime image ──────────────────────────
+.git
+.gitignore
+.github
+.claude
+test
+docs
+scripts
+plan.md
+task-brief.md
+readme.md
+README.md
+.DS_Store

@@ -1,0 +1,61 @@
+# Per-video style presets.
+#
+# `quality_preset` decides pixels — resolution, fps, codec. This decides *voice*:
+# how the narration reads and how dense the board is. They are separate because a
+# 1080p exam drill and a 1080p gentle walkthrough are the same pixels and very
+# different videos.
+#
+# Each style is two sentences the model is given directly: one shaping narration,
+# one shaping the picture. Prose rather than knobs, because that is what the model
+# acts on — a `density: 0.7` would have to be translated into a sentence anyway,
+# and the translation is the part worth reviewing.
+#
+# Adding a style is an entry here. No code changes.
+
+default: explainer
+
+styles:
+  explainer:
+    label: "Explainer"
+    narration: >-
+      Warm and clear, addressed to one learner. Introduce each idea before using it,
+      and connect each scene to the one before.
+    visual: >-
+      One drawn idea per board, room to breathe. Show the relationship with boxes
+      and drawn arrows rather than naming it in text.
+
+  lecture:
+    label: "Lecture"
+    narration: >-
+      Measured academic delivery. State the result, then the reasoning that supports
+      it. Terminology used precisely and without apology.
+    visual: >-
+      Dense but ordered drawings: structure first, then detail. Labelled parts and
+      drawn connections, every step a shape rather than a line of text.
+
+  exam_drill:
+    label: "Exam drill"
+    narration: >-
+      Brisk and specific. Lead with what is examinable — definitions, formulas,
+      the distinctions that get marked. Skip narrative framing.
+    visual: >-
+      High information density, all of it drawn. Comparison grids, labelled
+      formulas, worked steps as flows. Every board worth photographing for revision.
+
+  story:
+    label: "Story"
+    narration: >-
+      Narrative arc: set up the problem, build tension toward why the naive answer
+      fails, then resolve it. Concrete before abstract, always.
+    visual: >-
+      Sparse and cinematic. One striking drawn image per beat, large and simple;
+      let the narration carry the detail rather than the board.
+
+  quick_recap:
+    label: "Quick recap"
+    narration: >-
+      Assume the material has been seen before. Compress to conclusions and the
+      single line of reasoning behind each. No worked derivations.
+    visual: >-
+      Minimal drawings — one shape holding the two or three things worth
+      remembering. Simple enough to read at a glance, still a picture not a list.

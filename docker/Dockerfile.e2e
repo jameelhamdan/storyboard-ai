@@ -1,0 +1,46 @@
+# The end-to-end harness. Unlike the api/worker images this one is deliberately
+# a *dev* image: it keeps devDependencies and runs the TypeScript directly
+# through tsx, so editing e2e/config.ts changes the next run with no rebuild.
+#
+# It carries ffmpeg for the same reason the worker does — the render and encode
+# stages are real here, not mocked.
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+ENV NODE_ENV=development
+ENV CHROMIUM_PATH=/usr/bin/chromium
+
+# Chromium for the Playwright renderer. Debian's package rather than a
+# Playwright-downloaded build: `playwright-core` ships no browser, and pulling
+# one at build time would add a vendor CDN to the supply chain for a binary
+# apt already provides. Kalam is vendored under assets/ for the same reason —
+# the page runs with every outbound request blocked.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ffmpeg \
+      chromium \
+      fonts-liberation \
+      tini \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Everything below is bind-mounted over by compose, so these copies only matter
+# when the image is run standalone (`docker run`) without the mounts.
+COPY tsconfig*.json ./
+COPY src ./src
+COPY config ./config
+COPY prompts ./prompts
+COPY assets ./assets
+COPY e2e ./e2e
+
+# The output directory is a bind mount to the host, so the uid has to be able to
+# write to it. Running as root here is a deliberate trade for a throwaway test
+# container — the api/worker images that actually face the network do not.
+RUN mkdir -p /out
+
+# The run command lives in ENTRYPOINT, not CMD, so that
+# `docker compose run --rm e2e --scenario spanish` *appends* the flag.
+# In CMD it would replace the whole command instead.
+ENTRYPOINT ["/usr/bin/tini", "--", "npx", "tsx", "e2e/run.ts", "--out", "/out", "--keep"]

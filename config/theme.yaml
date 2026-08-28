@@ -1,0 +1,61 @@
+# Whiteboard theme tokens — see docs/whiteboard-style.md
+# Emitted as :root CSS custom properties at render time.
+# Change the token, never the component.
+
+default: standard
+
+presets:
+  standard:
+    board:
+      background:        "#FFFFFF"   # the board
+      vignette:          "none"      # "subtle" adds a faint edge shadow
+      padding_rem:       4
+    ink:
+      primary:           "#1F2933"   # main marker — near-black, not pure black
+      secondary:         "#52606D"   # supporting text
+      accent:            "#2B6CB0"   # primary emphasis, arrowheads, the active element
+      # Parallel things need telling apart. Blue / ochre / green are distinct in
+      # hue rather than only in saturation, which survives video encoding.
+      accents:
+        - "#2B6CB0"
+        - "#B7791F"
+        - "#2F855A"
+      muted:             "#9AA5B1"   # axes, gridlines, de-emphasised
+    stroke:
+      width_px:          3
+      linecap:           "round"
+      jitter:            0.6         # 0 = ruler-straight, 1 = visibly hand-drawn; >0.8 reads sloppy
+      corner_radius_px:  6
+    type:
+      family:            "'Kalam', 'Segoe Print', cursive"
+      fallback:          "system-ui, sans-serif"
+      title_rem:         3.2
+      body_rem:          2.0
+      label_rem:         1.6
+      min_rem:           1.4         # legibility floor — Stage A fails the scene below this
+      line_height:       1.35
+      letter_spacing_em: 0.01
+    motion:
+      draw_ms_per_100px: 180         # line-drawing speed
+      reveal_ms:         260         # fade/rise duration for text
+      ease:              "cubic-bezier(0.4, 0.0, 0.2, 1)"
+      stagger_ms:        90          # gap between sibling reveals sharing an anchor
+
+  # Cleaner, more corporate — for material where handwriting reads as unserious
+  # (finance, medicine, law). Inherits `standard`; only the deltas below apply.
+  crisp:
+    inherits: standard
+    stroke:
+      jitter:            0.2
+    type:
+      family:            "'Inter', 'Segoe UI', system-ui, sans-serif"
+
+# Stage A deterministic checks read these; they are not style, they are the gate.
+legibility:
+  min_contrast_ratio:    4.5         # against board.background
+
+# The renderer runs under a CSP with no external requests — fonts must be in the image.
+fonts:
+  selfHostDir:           assets/fonts
+  required:
+    - Kalam

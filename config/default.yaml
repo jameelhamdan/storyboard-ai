@@ -1,0 +1,145 @@
+# Behavioural configuration — see plan.md §3.
+# Every value here is overridable per environment; none is hardcoded in source.
+# Secrets and deployment endpoints live in .env, never here.
+#
+# Two exceptions read .env first with the value here as fallback, because brief §5
+# names them as .env-configurable and verifies it: queue.maxDepth (QUEUE_MAX_DEPTH)
+# and queue.workerConcurrency (WORKER_CONCURRENCY).
+
+input:
+  maxRequestBytes:        524288000   # 500 MB total per request
+  maxFileBytes:           209715200   # 200 MB per individual file
+  maxSourcesPerRequest:   20
+  maxPdfPages:            200
+  maxMediaDurationSeconds: 10800      # 3 h — YouTube and audio uploads
+  archive:                            # DOCX/PPTX are zip containers
+    maxEntries:           2000
+    maxUncompressedBytes: 314572800
+    maxCompressionRatio:  120
+  fetch:
+    timeoutMs:            30000
+    maxRedirects:         5
+    maxResponseBytes:     52428800
+    allowedSchemes:       [http, https]
+
+content:
+  insufficient:                       # evaluated after consolidation, on deduped content
+    minWords:             400
+    minDistinctConcepts:  3
+  dedupeSimilarityThreshold: 0.92
+  sourcePrecedence:                   # highest first; decides conflicts, never discards silently
+    - typed_document
+    - slides
+    - transcript
+    - ocr_photo
+
+storage:
+  prefix:                 generated/
+  presignTtlSeconds:      86400
+
+workspace:                            # §4 — shared, not local; a requeued job resumes elsewhere
+  sharedVolumePath:       /workspace
+  orphanSweepAfterSeconds: 3600
+
+pacing:
+  wordsPerMinute:
+    en:                   150
+    es:                   135         # Spanish runs ~10% more syllables
+
+duration:                             # DurationPolicy — content volume -> target length
+  minSeconds:             60          # floor; FR-4 asks for ~2 min, this allows short test lessons
+  maxSeconds:             600         # FR-4 hard cap: 10 min
+  secondsPerHundredWords: 40
+  targetToleranceSeconds: 20
+
+subtitles:                            # SubtitleSegmentationPolicy
+  maxCharsPerLine:        42
+  maxLines:               2
+  minCueDurationMs:       900
+  maxCueDurationMs:       6000
+  interCueGapMs:          80
+  maxDriftMs:             100         # FR-8 tolerance; also a Stage A check
+
+audio:
+  loudnessTargetLufs:     -16         # EBU R128
+  truePeakDb:             -1.5
+  interSceneGapMs:        350
+  trimSilenceThresholdDb: -45
+
+judge:
+  # The legibility floor lives in theme.yaml (type.min_rem and
+  # legibility.min_contrast_ratio) — it is a property of the look, and stating it
+  # twice is how the two drift apart.
+  # Three, not two: each retry is targeted — the model is told which gate it
+  # failed — so the extra attempt is a real repair rather than a reroll. Priced
+  # in at the raised target.
+  maxSceneRetries:        3
+  maxFallbackScenes:      3           # exceeding this fails the job with GENERATION_FAILED
+  # The story plan gets fewer attempts than a scene does, and deliberately.
+  # A rejected board is one board; a rejected plan rewrites the whole script,
+  # and a judge asked a third time tends to start trading one objection for
+  # another rather than converging. Two attempts is one real revision.
+  maxPlanRevisions:       1
+
+# The optional halves of the pipeline, per deployment. A request may override
+# either one (see docs/api-contract.md); these are what it inherits when it says
+# nothing.
+#
+# Both default on because both raise quality and this service is measured on
+# quality against a cost target, not on cost alone. Turn `images` off to keep
+# every board drawn; turn `planReview` off to skip the pre-illustration story
+# review and its possible rewrite.
+features:
+  images:                 true
+  # The libraries an illustration may come from, in preference order. Listing one
+  # the deployment has no credential for is harmless — the job gets the
+  # intersection — so this is the *menu*, and .env decides what is on it.
+  #
+  # `ImageSourcePolicy` still routes a diagram query to Commons before a stock
+  # library whatever this order says: which source suits which question is a
+  # judgement about the material, not a preference.
+  imageSources:           [wikimedia, unsplash, pexels, web_search, generated]
+  planReview:             true
+
+# Per-stage fan-out caps. These are provider rate limiting as much as they are
+# throughput: the account this was measured on allows 30,000 tokens per minute
+# on gpt-4.1, and a judge call carries a full-resolution PNG plus the board's
+# markup. Judging six scenes at once burst straight through that and failed the
+# job. Raise them with the account's TPM, not with the machine's cores.
+concurrency:
+  storyboard:             3
+  judge:                  2           # was serial; that was 80% of a run's wall clock
+  speechSynthesis:        4
+  renderSegments:         6
+
+queue:
+  maxDepth:               1000        # env: QUEUE_MAX_DEPTH
+  workerConcurrency:      2           # env: WORKER_CONCURRENCY
+  stalledIntervalMs:      30000
+
+job:
+  idempotency:
+    enabled:              true        # §1 — honours Idempotency-Key when the caller sends one
+    ttlSeconds:           86400
+  # The number the pricing tier is set from, and the one publish warns against.
+  # A knob rather than a constant because it is a business decision, not a fact
+  # about the pipeline — it moved from 0.10 to 0.20 to buy frontier models on
+  # every call.
+  costTargetPerMinuteUsd: 0.20
+  # Circuit breaker per job, not per minute. Sized so a legitimate job never
+  # trips it: the worst case is a 10-minute video whose every scene exhausts its
+  # three retries, which costs about $4.44 at the configured models. $6.00 clears
+  # that and still catches a runaway regeneration loop long before it matters.
+  costCeilingUsd:         6.00
+  stateTtlSeconds:        604800      # how long /status remains pollable
+  maxAttempts:            3
+
+logging:
+  level:                  info
+  redactPaths:            # content and secrets never reach the log
+    - req.headers.authorization
+    - req.body.files
+    - req.body.urls
+    - "*.narration"
+    - "*.content"
+    - "*.text"

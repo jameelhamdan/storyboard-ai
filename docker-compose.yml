@@ -1,0 +1,109 @@
+# `docker-compose up` is the only setup step beyond .env (brief §FR-11).
+#
+# Scale workers with:  docker compose up --scale worker=4
+# Throughput rises with N up to the host's core count.
+
+services:
+  redis:
+    image: redis:7-alpine
+    # appendonly so a restart does not lose queued jobs.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    env_file: [.env]
+    environment:
+      REDIS_URL: redis://redis:6379
+      WORKSPACE_DIR: /workspace/jobs
+      STORAGE_LOCAL_DIR: /workspace/artifacts
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # The shared workspace. Both services mount it at the same path, which is
+      # what lets a job queued by the API be picked up by any worker, and a
+      # requeued job resume on a different worker than started it (plan.md §4).
+      - workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    env_file: [.env]
+    environment:
+      REDIS_URL: redis://redis:6379
+      WORKSPACE_DIR: /workspace/jobs
+      STORAGE_LOCAL_DIR: /workspace/artifacts
+    volumes:
+      - workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      # Brief §5 requires per-worker CPU and memory limits so one heavy job
+      # cannot starve the others. Rendering is the CPU-hungry stage; 2 cores and
+      # 4GB is sized for 720p24 with WORKER_CONCURRENCY=2.
+      resources:
+        # ffmpeg spawns freely; the pid cap stops a runaway render exhausting
+        # host PIDs and taking every other worker down with it.
+        limits: { cpus: "2.0", memory: 4G, pids: 512 }
+        reservations: { cpus: "0.5", memory: 1G }
+
+  # ── End-to-end harness ─────────────────────────────────────────────────────
+  # Not part of `docker compose up`: it sits behind a profile so it only runs
+  # when asked for explicitly.
+  #
+  #   docker compose run --rm e2e
+  #   docker compose run --rm e2e --scenario spanish
+  #
+  # Needs no Redis and no HTTP — it drives the pipeline in-process, so a failure
+  # is a pipeline failure and nothing else. Output lands in ./out on the host.
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.e2e
+    env_file: [.env]
+    environment:
+      # The compose defaults elsewhere in this file point at the shared
+      # /workspace volume; the harness manages its own tree under /out instead.
+      WORKSPACE_DIR: /out/jobs
+      STORAGE_LOCAL_DIR: /out/artifacts
+    volumes:
+      # Source is mounted rather than baked so editing the lesson text in
+      # e2e/config.ts takes effect on the next run with no rebuild.
+      - ./e2e:/app/e2e
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      # Tests that need Chromium can only run in here, so the suite and its
+      # config are mounted alongside the source.
+      - ./test:/app/test
+      # The gallery is a contract the tests read, not just prose.
+      - ./docs:/app/docs
+      - ./vitest.config.ts:/app/vitest.config.ts
+      - ./config:/app/config
+      - ./prompts:/app/prompts
+      - ./assets:/app/assets
+      # The generated MP4, SRT and traceability JSON, readable from the host.
+      - ./out:/out
+
+volumes:
+  redis-data:
+  workspace:

@@ -1,0 +1,40 @@
+# Quality presets — see plan.md §3.
+# Selectable per request via the optional `quality_preset` field.
+# Resolution, fps, codec and CRF are independent fields: 720p24 is the default,
+# not a fixed constant.
+
+default: standard
+
+presets:
+  standard:
+    width:      1280
+    height:     720
+    fps:        24
+    codec:      h264
+    crf:        23
+    # Production playback, and the preset the payment tier is measured at.
+
+  draft:
+    width:      960
+    height:     540
+    fps:        24
+    codec:      h264
+    crf:        28
+    # Fast internal preview.
+
+  high:
+    width:      1920
+    height:     1080
+    fps:        30
+    codec:      h264
+    crf:        20
+    # Higher-fidelity option. O-4: assumed exempt from the 5-minute target;
+    # its real timing gets documented rather than assumed.
+
+  vertical:
+    width:      720
+    height:     1280
+    fps:        24
+    codec:      h264
+    crf:        23
+    # Short-form / mobile-native.

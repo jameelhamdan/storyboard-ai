@@ -1,0 +1,42 @@
+# ── build ────────────────────────────────────────────────────────────────────
+FROM node:20-bookworm-slim AS build
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY tsconfig*.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
+
+# ── runtime ──────────────────────────────────────────────────────────────────
+FROM node:20-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+# ffprobe only: the API validates and enqueues, it never renders.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg tini \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY config ./config
+# Prompts are read at runtime from PROMPT_DIR, and verifyAll() checks them at
+# boot — without this the image starts fine on stubs and dies the moment a real
+# LLM driver is selected.
+COPY prompts ./prompts
+COPY assets ./assets
+
+# Never run as root: this process writes caller-supplied bytes to disk.
+RUN useradd --system --uid 10001 --create-home appuser \
+ && mkdir -p /workspace/jobs /workspace/artifacts \
+ && chown -R appuser:appuser /app /workspace
+USER appuser
+
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/interfaces/http/server.js"]
