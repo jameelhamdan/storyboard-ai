@@ -110,7 +110,7 @@ and the model-facing ones also have a stub.
 | `SpeechSynthesisPort` | `OpenAiSpeechSynthesizer`, `ElevenLabsSpeechSynthesizer`, `GeminiSpeechSynthesizer` | `StubSpeechSynthesizer` |
 | `TranscriptionPort` | `WhisperCliTranscriber` | `StubTranscriber` |
 | `WordAligner` (infrastructure-only) | `WhisperCliWordAligner`, `GeminiWordAligner`, `OpenAiWordAligner` — recovers word timings for a synthesiser that reports none | — |
-| `SceneRendererPort` / `ScenePreviewPort` | `PlaywrightSceneRenderer` / `PlaywrightScenePreviewer` | — |
+| `SceneRendererPort` / `BoardPreviewPort` | `PlaywrightSceneRenderer` / `PlaywrightScenePreviewer` — both work in **boards**: one document loaded once and seeked across its whole span | — |
 | `VideoEncoderPort` | `FfmpegAssembler` | — |
 | `ObjectStoragePort` | `LocalObjectStorage` | — |
 | `WorkspacePort` | `SharedVolumeWorkspace` | — |
@@ -271,12 +271,12 @@ mislabelled binary produces unreadable characters the content thresholds reject,
 
 Recorded here so they are not rediscovered as surprises:
 
-- **The quality judge is a stub by default.** `StubQualityJudge` passes everything. With
-  `LLM_DRIVER=openai` the scene judge is real and looks at a rendered screenshot, but nothing it
-  reports is a measurement until the rubric is calibrated.
+- **The quality judge is a stub by default.** `StubQualityJudge` passes everything. With a real
+  `LLM_DRIVER` the board judge looks at a rendered screenshot per step, but nothing it reports is a
+  measurement until the rubric is calibrated.
 - **OpenAI TTS timings are recovered, not authoritative.** `/v1/audio/speech` returns audio without
   word timings, so `OpenAiSpeechSynthesizer` transcribes its own output to recover them — a second
-  billed call per scene, metered into the `tts` line. `resolvePhrase` falls back to the longest
+  billed call per scene, metered into the `tts` line rather than hidden. `resolvePhrase` falls back to the longest
   leading prefix of an anchor, so one misheard word no longer drops the anchor entirely, but the
   timings are still a transcription of the audio rather than an alignment against the script.
   `elevenlabs` reports per-character alignment and remains strictly stronger; `openai` is the
@@ -300,18 +300,27 @@ Recorded here so they are not rediscovered as surprises:
   human judgement, and the holistic score is uncalibrated — so the pipeline cannot answer "did that
   change improve quality?" and neither can anyone reading its output. `docs/judge-rubric.md` §
   Calibration is the procedure; it has not been run.
-- **Nothing judges the finished video, or animation over time.** Every assessment is one static
-  frame per scene attempt. Reveal timing, draw order and sync drift are structurally invisible.
+- **Nothing judges the finished video, or animation over time.** Every assessment is a still frame.
+  Stage B does see one frame per step, so the order a board *builds* in is gated — but reveal timing
+  within a step, draw order and audio sync drift remain structurally invisible.
 - **20-job concurrency is unverified.** Local checks cover isolation, queueing, requeue-on-kill and
   `--scale` at 3 and 6 jobs, with stub providers.
-- **No full run against *real models* since the diagram rework.** The last live-model run
-  (`out/20260827-202226-battery`) predates it entirely and is what motivated the rework. Every board
-  shape is verified in a real browser by `test/integration/diagram-layout.test.ts`, and the whole
-  pipeline is verified end to end with stub providers — but what neither exercises is a real model
-  filling a `SceneDiagram`: whether it picks good nodes, whether its anchors match the narration,
-  and what the judge makes of the result. That run is the next thing to do.
+- **No full run against *real models* since boards landed.** The last live-model run
+  (`out/20260828-152720-heart`) predates them. Every board shape is verified in a real browser by
+  `test/integration/diagram-layout.test.ts`, and the whole pipeline is verified end to end with stub
+  providers including multi-step boards — but what neither exercises is a real model *choosing* where
+  boards break and which step each element belongs to. Whether it builds a diagram the way a teacher
+  would is the open question, and only a live run answers it.
 - **Cost figures are estimates.** Every number in `DEFAULT_PRICING` is a guess until an invoice
   lands, and the per-video-minute figure inherits that uncertainty. The target itself
   (`job.costTargetPerMinuteUsd`, currently $0.20) is a business decision rather than a fact about
-  the pipeline, which is why it is config and not a constant — it moved from $0.10 to buy frontier
-  models on every call.
+  the pipeline, which is why it is config and not a constant.
+
+  The shape of the bill is worth stating, because it is not where it was assumed to be. On
+  `out/20260828-152720-heart` — a real Gemini run — the LLM lines were $0.373 of a $0.390 video, and
+  they split **95% quality tier to 5% volume tier** ($0.354 against $0.019). *Output* tokens were
+  most of it: 27,091 out against 43,400 in, and a thinking model bills its reasoning as output.
+
+  So the volume tier, long assumed to dominate because it makes the most calls, is a rounding error.
+  If the target tightens, the levers are the quality tier's thinking budget and the per-call output
+  ceilings — downgrading the volume model is not.

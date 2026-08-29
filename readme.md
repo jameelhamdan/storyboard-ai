@@ -1,31 +1,39 @@
 # StudyCore Generation API
 
-Turns course material — PDF, DOCX, PPTX, images, web pages, YouTube, audio — into a
-whiteboard explainer video with subtitles, quiz questions and per-job cost metadata.
+Turn a lecture PDF into a narrated whiteboard explainer video.
 
-Design rationale lives in [`plan.md`](plan.md). This README is how to run it.
-
-- [`docs/architecture.md`](docs/architecture.md) — how the system is put together, and why
-- [`docs/workflow.md`](docs/workflow.md) — a request's full path, stage by stage
-- [`docs/api-contract.md`](docs/api-contract.md) — request and response shapes
-
----
-
-## Quick start
+Upload course material — PDF, DOCX, PPTX, images, web pages, YouTube links, audio — and get
+back an MP4 with subtitles, quiz questions, and a citation trail from every spoken claim to
+the page it came from.
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-That is the only setup step. Every provider defaults to a stub, so the pipeline runs
-end to end with **no credentials and no spend** — you get a real MP4 out of a real PDF.
+That's the whole setup. Every provider defaults to a stub, so the pipeline runs end to end
+with **no API keys and no spend** — you get a real MP4 out of a real PDF on the first try.
 
-- API: <http://localhost:3000>
-- OpenAPI: <http://localhost:3000/docs>
-- Health: <http://localhost:3000/v1/health>
+---
 
-Generate something:
+## What it makes
+
+Not a slideshow. The video is drawn: each scene is a diagram from a fixed vocabulary of
+thirteen shapes — a flow, a cycle, a comparison, a timeline — rendered as SVG strokes and
+handwritten-style text that draw themselves in as the narrator reaches them.
+
+**Diagrams build across scenes.** Consecutive scenes can share one board: it's laid out once
+and grown a piece at a time, so the thing being explained stays on screen while the narration
+walks around it. Parts already drawn recede so the current one stands out. This is the
+difference between a lesson and a slideshow, and it's the main thing the renderer exists to do.
+
+Every element is anchored to a *phrase* in the narration, not to a timestamp. After speech is
+synthesized the whole timeline is rebuilt from the measured audio, so a box appears exactly
+when its words are spoken — however long the voice took to say them.
+
+---
+
+## Using it
 
 ```bash
 curl -X POST http://localhost:3000/v1/generate \
@@ -36,166 +44,25 @@ curl -X POST http://localhost:3000/v1/generate \
 curl http://localhost:3000/v1/status/<job_id>
 ```
 
-Scale workers:
+Generation is asynchronous — poll `status_url` until it reports `completed`, then fetch the
+`video_url`, `subtitle_url`, `traceability_url` and `cost_url` from the payload.
+
+- API — <http://localhost:3000>
+- Interactive OpenAPI docs — <http://localhost:3000/docs>
+- Health — <http://localhost:3000/v1/health>
+
+More workers, more throughput:
 
 ```bash
 docker compose up --scale worker=4
 ```
 
----
+Full request and response shapes are in [`docs/api-contract.md`](docs/api-contract.md).
 
-## What works today, and what does not
+### Shaping a single video
 
-The build follows the milestone order in `plan.md` §10. **M2 is complete**: the whole
-API surface, queueing, the fifteen-stage pipeline, checkpointing, Docker, and real
-video output. The stages that need a model provider are stubbed behind their ports.
-
-| Area | Status |
-|---|---|
-| API contract, OpenAPI, error envelope | ✅ real |
-| Queue, worker scaling, cancellation, requeue-on-death | ✅ real |
-| Checkpoint + resume across workers | ✅ real — verified by SIGKILL |
-| PDF / DOCX / PPTX / web extraction, provenance | ✅ real |
-| Consolidation, dedupe, conflict precedence | ✅ real (hashed embeddings, not semantic) |
-| Timing chain: anchors → word timings → retime → render | ✅ real |
-| Subtitles: SRT sidecar **and** a muxed `mov_text` track in the MP4 | ✅ real |
-| ffmpeg render, concat, loudness, mux | ✅ real |
-| Cost metering | ✅ real (prices are estimates until M1) |
-| Generation time per job | ✅ real — `generation_seconds` on the status payload |
-| Script + storyboard generation | ✅ real (OpenAI or Gemini) — stub by default |
-| Speech synthesis + word timings | ✅ real — ElevenLabs (per-character alignment), OpenAI or Gemini (timings recovered by an aligner) |
-| Quality judge, quiz, vision OCR | ✅ real (OpenAI or Gemini) — stub by default |
-| Transcription | ✅ real (local whisper.cpp) — stub by default |
-| Whiteboard aesthetic | ✅ real — every scene is a diagram (one of thirteen shapes), HTML/CSS for text and SVG for strokes, enforced by a pre-render gate |
-| Diagrams that build across scenes | ✅ real — consecutive scenes share one board: it is drawn once and grown a step at a time, with earlier steps receding as the focus moves. One storyboard call and one judge call per board rather than per scene |
-| Story plan review before illustration | ✅ real — the scene set, order and per-scene shape are judged and revised before a board exists |
-| Found images on a board | ✅ real — Wikimedia Commons, Unsplash, Pexels; inlined, credited, selectable per request |
-| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default. **Keyless only** unless you bring a Brave key: `WEB_SEARCH_DRIVER=duckduckgo` costs nothing |
-| Found diagrams draw themselves | ✅ real — contours traced once into SVG strokes, revealed like every other drawn line, deterministic per frame |
-| Visual plan + vision judge | ✅ real — palette chosen per video, scenes judged from screenshots |
-
-The stubs are deliberately *honest*: where there is genuinely no content, the pipeline
-reports insufficient content rather than fabricating a transcript. The one exception is
-the judge, which passes everything — it exists to exercise the pipeline shape, and any
-quality number it reports is a placeholder until M7.
-
----
-
-## Running it for real
-
-Everything defaults to stubs, so `npm run e2e` produces a video with no keys and
-no spend. To use the real models:
-
-Every credential the service reads is listed in `.env`, grouped by what it
-unlocks. Fill in the ones you need — anything left blank keeps its stub.
-
-```bash
-LLM_DRIVER=openai                   # one key, US endpoint, no residency guarantee
-OPENAI_API_KEY=<your-key>           # https://platform.openai.com/api-keys
-
-# ...or Gemini, on one key for both the models and the voice.
-#LLM_DRIVER=gemini
-#GEMINI_API_KEY=<your-key>          # https://aistudio.google.com/apikey
-
-# Speech: either reuse the OpenAI key...
-TTS_DRIVER=openai
-
-# ...or ElevenLabs, which returns per-character alignment with the audio.
-#TTS_DRIVER=elevenlabs
-#ELEVENLABS_API_KEY=<your-key>      # https://elevenlabs.io/app/settings/api-keys
-
-# Found images on a board are enabled by the presence of a key — no driver flag.
-# Leave all three unset and every board is drawn, exactly as before.
-#UNSPLASH_ACCESS_KEY=<your-key>     # photographs
-#PEXELS_API_KEY=<your-key>          # photographs, a second library
-#WIKIMEDIA_IMAGES=true              # published scientific diagrams; no key needed
-
-# A request picks from those per job:
-#   features.image_sources: ["wikimedia", "unsplash"]
-#
-# Every picture on a board either already exists or is drawn by the renderer.
-# There is no image-generation model in this service.
-
-# Rendering is always Chromium via Playwright, which the worker and e2e images
-# install — so a full run works under docker compose, not on a bare host.
-
-# Run it. `--no-voice` forces silent narration, so the whole timing chain and
-# every visual is exercised without a TTS plan.
-docker compose run --rm e2e
-docker compose run --rm --entrypoint "npx tsx e2e/run.ts --no-voice --out /out --keep" e2e
-```
-
-> ElevenLabs' free plan cannot use Voice Library voices over the API. Either use a
-> voice your workspace owns, or run `--no-voice` until you have a paid plan —
-> `npm run preflight` checks this for you without spending anything.
-
-### Choosing a TTS driver
-
-The pipeline's whole timeline is word-anchored, so what separates these is where the
-word timings come from — not voice quality.
-
-| `TTS_DRIVER` | Timings | Cost of a 3-min video |
-|---|---|---|
-| `openai` | Recovered: the adapter transcribes its own audio with `whisper-1` | ~$0.107 (~$0.036/video-min) |
-| `elevenlabs` | Authoritative: per-character alignment returned with the audio | ~$0.089 (~$0.030/video-min) |
-| `gemini` | Recovered on the same key: the narration text and the audio go back to Gemini, which places known words rather than transcribing unknown ones. Local whisper.cpp takes precedence when `STT_DRIVER=whisper`; OpenAI is the last fallback. The boot log says which | ~$0.09 (~$0.03/video-min) |
-| `stub` | Real timings over silence | free |
-
-All three are inside the target. `openai` costs a little more because it
-pays twice — once to synthesize, once to align — and that second call is metered into
-the `tts` line of `cost.json` rather than hidden. Every figure is an estimate from the
-configured pricing table until a real invoice lands.
-
-### Speech-to-text
-
-Only needed for audio uploads and YouTube links without captions.
-
-| `STT_DRIVER` | What it does |
-|---|---|
-| `whisper` | Local whisper.cpp. **Student audio never leaves the machine** — the cleanest GDPR position, and free. Needs the binary and a model. |
-| `stub` | Returns nothing, so an audio-only job reports `INSUFFICIENT_CONTENT` rather than inventing a transcript. |
-
-There is no hosted option: transcription is local or nothing.
-
-For local Whisper:
-
-```bash
-git clone https://github.com/ggerganov/whisper.cpp && cd whisper.cpp && make
-./models/download-ggml-model.sh large-v3-turbo
-```
-
-then set `WHISPER_BINARY` and `WHISPER_MODEL_PATH`. It shells out to the binary
-rather than binding in-process, so a missing toolchain never breaks
-`npm install` for people who will never transcribe anything.
-
-Two model tiers are configured separately, which is the cost decision made
-concrete — the expensive model reads the student's material, the cheap one
-grades our own output:
-
-| Variable | Used for | Default |
-|---|---|---|
-| `OPENAI_MODEL_QUALITY` | script, visual plan, reading images, **judging each rendered board** | `gpt-4.1` |
-| `OPENAI_MODEL_VOLUME` | scene diagrams, quiz | `gpt-4.1` |
-
-The split is by how hard the judgement is, not by whose material it is. The scene
-judge sits on the quality tier because it looks at a *screenshot* and decides
-whether the board reads — the hardest perceptual call in the pipeline, and the
-gate on every diagram. It is cheap to put there: it writes a verdict (~300 tokens)
-where the storyboard writes markup (~2,200).
-
-The volume tier dominates spend — roughly 20,000 output tokens per video against
-1,600 for the quality tier — so the quality model can be much stronger without
-moving the per-video-minute figure much.
-
-At the **$0.20/video-minute** target (`job.costTargetPerMinuteUsd`) both tiers run
-the frontier model: a 3-minute video costs about **$0.106/video-min**, or $0.125
-if a quarter of scenes regenerate — roughly 40% under. The tiers still exist and
-still matter: `volume` is ~9x the tokens, so it is the first thing to downgrade
-if the budget tightens.
-
-### Customising a single video
-
-Two request fields, independent of `quality_preset` (which is pixels only):
+`style` changes how the video reads; `direction` is free text for anything a style doesn't
+cover. Both are independent of `quality_preset`, which is pixels only.
 
 ```bash
 curl -X POST http://localhost:3000/v1/generate \
@@ -207,61 +74,212 @@ curl -X POST http://localhost:3000/v1/generate \
 | `style` | Narration | Board |
 |---|---|---|
 | `explainer` *(default)* | warm, one idea at a time | room to breathe |
-| `lecture` | measured, result-then-reasoning | dense but ordered |
+| `lecture` | measured, result then reasoning | dense but ordered |
 | `exam_drill` | brisk, leads with what is examinable | high density, revision-ready |
 | `story` | narrative arc, concrete before abstract | sparse, one image per beat |
 | `quick_recap` | assumes prior exposure, conclusions only | minimal |
 
-Styles live in `config/styles.yaml` as two sentences each — one shaping the script,
-one shaping the picture. Adding one is a config entry, no code. `direction` is free
-text (≤ 500 chars) for anything a style doesn't cover; it is fenced in the prompt so
-it cannot override the grounding and citation rules.
+Styles are two sentences each in `config/styles.yaml` — one shaping the script, one shaping
+the picture. Adding one is a config entry, not code.
 
-### Changing what gets generated
+Other per-request options: `quality_preset` (720p/1080p/vertical/draft), `voice`,
+`target_duration_seconds`, `student_context`, and `features` to toggle images, web research
+and story-plan review.
 
-**`e2e/config.ts`** holds the scenario — source material, language, student
-context, preset. It is plain data with no logic; edit it and rerun.
+---
+
+## Running it with real models
+
+Everything defaults to a stub. Fill in only the keys for what you want, and anything left
+blank keeps its stub. `.env.example` lists every credential the service reads, grouped by
+what it unlocks.
+
+```bash
+# One key for both the models and the voice:
+LLM_DRIVER=gemini
+TTS_DRIVER=gemini
+GEMINI_API_KEY=<your-key>        # https://aistudio.google.com/apikey
+
+# ...or OpenAI:
+#LLM_DRIVER=openai
+#TTS_DRIVER=openai
+#OPENAI_API_KEY=<your-key>       # https://platform.openai.com/api-keys
+
+# ...or ElevenLabs for speech only, which returns word alignment with the audio:
+#TTS_DRIVER=elevenlabs
+#ELEVENLABS_API_KEY=<your-key>
+```
+
+Then:
+
+```bash
+docker compose run --rm e2e            # source material in, MP4 out
+npm run preflight                      # check keys and voices without spending
+```
+
+### Choosing a speech driver
+
+The timeline is word-anchored, so what separates these is **where the word timings come
+from**, not voice quality.
+
+| `TTS_DRIVER` | Word timings |
+|---|---|
+| `elevenlabs` | Authoritative — per-character alignment returned with the audio |
+| `openai` | Recovered — the adapter transcribes its own output, a second billed call |
+| `gemini` | Recovered on the same key, given the narration text so it places known words rather than transcribing unknown ones |
+| `stub` | Real timings over silence — free, and the whole timing chain still runs |
+
+For `gemini`, local whisper.cpp is preferred when `STT_DRIVER=whisper` (free, and the audio
+never leaves the machine); the boot log says which aligner is in use.
+
+### Speech-to-text
+
+Only needed for audio uploads and YouTube links without captions. **Local or nothing** —
+there is no hosted option, so student audio never leaves the machine.
+
+```bash
+git clone https://github.com/ggerganov/whisper.cpp && cd whisper.cpp && make
+./models/download-ggml-model.sh large-v3-turbo
+```
+
+Then set `STT_DRIVER=whisper`, `WHISPER_BINARY` and `WHISPER_MODEL_PATH`. It shells out to
+the binary rather than binding in-process, so a missing toolchain never breaks `npm install`
+for people who will never transcribe anything.
+
+### Images on a board
+
+A board is either drawn by the renderer or is a real photograph or published diagram found
+by search, inlined and credited under the picture. **Nothing here generates imagery with a
+model.** The feature turns on when a library is reachable:
+
+```bash
+#UNSPLASH_ACCESS_KEY=<your-key>   # photographs
+#PEXELS_API_KEY=<your-key>        # a second photo library
+#WIKIMEDIA_IMAGES=true            # published scientific diagrams, no key needed
+```
+
+With none of them set, every board is drawn.
+
+### Web research
+
+Off by default. When on, searched pages are fetched through the SSRF guard, chunked with
+provenance, and cited exactly like an uploaded PDF — so a researched fact stays traceable.
+
+`WEB_SEARCH_DRIVER=duckduckgo` needs **no credential at all**. `brave` needs a key and also
+serves the `web_search` image source.
+
+### Cost
+
+Every job writes a `cost.json` broken down by stage, provider and model, and the status
+payload carries a summary. Two model tiers are configured separately — the expensive one
+reads the student's material and judges rendered boards, the cheap one describes diagrams
+and writes the quiz:
+
+| Variable | Used for |
+|---|---|
+| `GEMINI_MODEL_QUALITY` / `OPENAI_MODEL_QUALITY` | script, story-plan review, judging each board |
+| `GEMINI_MODEL_VOLUME` / `OPENAI_MODEL_VOLUME` | scene diagrams, quiz |
+
+**The quality tier is where the money goes** — it is the frontier model, it thinks before
+answering, and thinking tokens are billed as output. If a budget tightens, that tier is the
+first thing to look at, not the volume tier.
+
+`job.costTargetPerMinuteUsd` in `config/default.yaml` is the target a finished job is
+measured against; exceeding it logs a warning rather than failing the video.
+`job.costCeilingUsd` is a per-job circuit breaker that *does* stop a runaway.
+
+> Prices come from a table in `src/infrastructure/observability/CostMeter.ts` and are
+> estimates until checked against a real invoice. Treat the figures as ratios.
+
+---
+
+## Changing what it generates
+
+**Prompts** are `prompts/*.md` — plain Markdown, not string literals buried in code. A
+`## System` heading is the system prompt, `## User` is the user template, and
+`{{placeholders}}` are filled by the adapter. Prose before the first heading is notes for
+humans and is never sent.
+
+Edit one and rerun. Set `PROMPT_HOT_RELOAD=true` to skip the cache while iterating, or point
+`PROMPT_DIR` at another folder to A/B a whole set. An unfilled `{{placeholder}}` throws
+before the call is made rather than reaching the model as literal text.
+
+**The e2e scenario** is `e2e/config.ts` — plain data, no logic. Edit it and rerun:
 
 ```bash
 npm run e2e                          # the default scenario
 npm run e2e -- --scenario spanish    # Spanish output from an English source
-npm run e2e -- --file ./lecture.pdf  # your own PDF/DOCX/PPTX/TXT
+npm run e2e -- --file ./lecture.pdf  # your own file
+npm run e2e -- --no-voice            # silent narration, no TTS spend
 npm run e2e -- --keep                # leave the output directory in place
 ```
 
-### Changing the prompts
-
-**`prompts/*.md`** are the live prompts — plain Markdown, not string literals in
-code. A `## System` heading is the system prompt, `## User` is the user template,
-and `{{placeholders}}` are filled by the adapter. Prose before the first heading
-is notes for humans and is never sent.
-
-Edit one and rerun. Set `PROMPT_HOT_RELOAD=true` to skip the cache while
-iterating, or point `PROMPT_DIR` at a different folder to A/B a whole set.
-
-An unfilled `{{placeholder}}` throws before the call is made rather than
-reaching the model as literal text — and a contract test asserts every prompt
-declares exactly the variables its adapter supplies.
+Every run writes to `out/<timestamp>-<scenario>/` and nothing is deleted, so runs can be
+compared against each other.
 
 ---
 
-## Local development
+## How it works
+
+A request is validated and queued in under a second; a worker does everything else.
+
+```
+validate → [research] → ingest → transcribe → consolidate → script → [plan review]
+  → storyboard → [judge] → synthesize → subtitles → quiz → render → assemble → publish
+```
+
+Four decisions explain most of the design:
+
+**Provenance is attached at ingestion or it doesn't exist.** Every chunk of extracted text
+carries its source and page or timestamp, and the script stage rejects any sentence without a
+resolvable citation. That's what makes `traceability.json` an audit rather than a guess.
+
+**The story is judged before it's drawn.** A beautifully drawn board of the wrong idea passes
+every gate there is, so the scene set, its order and each scene's chosen shape are reviewed
+before a board exists — the cheapest stage that can send work backwards.
+
+**Everything that costs money happens before the render.** Render is the stage measured in
+tens of minutes and the one most likely to be interrupted, so a job resumed after a render
+failure re-pays for nothing at all.
+
+**Re-timing closes synthesis.** Planned scene durations never match synthesized audio, so the
+timeline is rebuilt from what was measured before a single frame is drawn. That re-time *is*
+the narration/visual sync mechanism.
+
+Stage by stage, with the reasoning: [`docs/workflow.md`](docs/workflow.md).
+
+### Resuming a dead worker
+
+Each stage's output persists to a **shared** job workspace, so a worker killed mid-job is
+requeued and resumes from the last finished stage rather than re-paying for LLM and TTS calls
+already made. Shared rather than local because the queue requeues to *any* worker — a
+checkpoint in one container's `/tmp` doesn't exist in the next.
+
+### Layout is not the model's job
+
+The model describes what a board *contains* — nodes, edges, labels, and which step of the
+build each arrives in — with no coordinates and no CSS. The renderer lays it out with grid and
+flex, so **overlap is not something to detect; it's something the format can't express.**
+
+This reversed an earlier design where the model wrote its own markup and a vision judge was
+asked whether the result looked right. A real run disproved it: a board whose centre box
+covered its neighbour passed every gate with a good score. Overlap, clipping and text size are
+now measured off the laid-out page, for free, before any model sees it.
+
+---
+
+## Development
 
 ```bash
 npm install
-npm run verify           # typecheck + lint + dead-code + tests
-npm test                 # no external dependencies
+npm run verify     # typecheck + lint + dead-code + tests
+npm test           # no external dependencies needed
 ```
 
 `npm run dev:api` and `npm run dev:worker` need Redis: `docker compose up redis`.
+Requires Node 20+ and `ffmpeg`/`ffprobe` on PATH — both are in the Docker images.
 
-Requires Node 20+ and `ffmpeg`/`ffprobe` on PATH (both are in the images).
-
----
-
-## Architecture
-
-DDD layering, enforced by lint rather than convention:
+### Layout
 
 ```
 interfaces/     Fastify routes, DTOs, OpenAPI, worker entry, composition root
@@ -270,135 +288,72 @@ domain/         entities, value objects, policies (no I/O, imports nothing)
 infrastructure/ provider adapters, queue, storage, renderer
 ```
 
-`npm run lint` fails the build if `domain/` imports another layer, if `application/`
-reaches into `infrastructure/`, or if a provider SDK is imported outside
-`infrastructure/`. **`interfaces/composition/container.ts` is the only file that names
-a provider** — swapping one is a line there plus a new adapter. (Fastify and pino do
-appear in `interfaces/http/`: those files *are* the web adapter.)
+The layering is enforced by lint, not convention: `npm run lint` fails if `domain/` imports
+another layer, if `application/` reaches into `infrastructure/`, or if a provider SDK is
+imported outside `infrastructure/`.
 
-`npm run deadcode` (knip) fails on unused files, exports or dependencies. It reports
-zero — every file is reachable, every config key is read, and nothing is installed
-that isn't imported.
+**`interfaces/composition/container.ts` is the only file that names a provider.** Swapping one
+is a line there plus a new adapter behind the existing port.
 
-### The pipeline
+`npm run deadcode` fails on unused files, exports or dependencies, and reports zero.
 
-```
-validate → ingest → transcribe → consolidate → script → storyboard → [judge]
-  → synthesize → subtitles → quiz → render → assemble → publish
-```
+### Configuration
 
-Three things are worth knowing:
+Two layers, deliberately separated:
 
-**The judge runs before the render**, so a bad scene costs one regeneration rather
-than a wasted 18,000-frame render.
-
-**Re-timing closes the synthesis stage.** Planned scene durations never match
-synthesized audio, so the storyboard timeline is rebuilt from measured audio before a
-single frame is drawn. That re-time is the actual narration/visual sync mechanism, and
-it is why rendering happens after synthesis rather than beside it.
-
-**Everything that costs money runs before the render.** Subtitles and the quiz need
-only the timed script, so they run early — which means a job interrupted during the
-28%-of-the-work render stage resumes without re-paying for a single model call.
-
-### Checkpointing and the shared workspace
-
-Each stage's output persists to a **shared** job workspace, so a worker that dies
-mid-job is requeued and resumes from the last finished stage rather than re-paying for
-LLM and TTS calls already made.
-
-The workspace is shared rather than local because BullMQ requeues to *any* worker — a
-checkpoint in one container's `/tmp` does not exist in the next. Locally that is a
-compose named volume; hosted, it is the object-storage adapter behind the same port.
-
----
-
-## Configuration
-
-Two layers, deliberately:
-
-- **`config/*.yaml`** — all behavioural spec: limits, thresholds, presets, pacing,
-  judge thresholds, retry budgets. Versioned, reviewable, no secrets.
+- **`config/*.yaml`** — all behavioural configuration: limits, thresholds, presets, pacing,
+  retry budgets. Versioned, reviewable, no secrets.
 - **`.env`** — secrets and deployment endpoints only.
 
-Two exceptions live in `.env` because the brief names and verifies them:
-`QUEUE_MAX_DEPTH` and `WORKER_CONCURRENCY`. Both read from `.env` first with the YAML
-value as fallback.
+`QUEUE_MAX_DEPTH` and `WORKER_CONCURRENCY` are the two exceptions, read from `.env` first with
+the YAML value as a fallback. Voice slot metadata lives in `config/voices.yaml` while each
+slot's provider voice id is an `.env` key, so swapping a voice never touches code.
 
-Voice slot metadata is in `config/voices.yaml`; the provider voice id for each slot is
-an `.env` key (`VOICE_EN_FEMALE_1`, …), so swapping a voice never touches code.
+### Load testing
+
+```bash
+node scripts/load-test.mjs --jobs 1 --base http://127.0.0.1:3000   # baseline first
+node scripts/load-test.mjs --jobs 3 --base http://127.0.0.1:3000
+```
+
+Run `--jobs 1` first — the under-load ceiling only means something relative to that baseline.
+Use `127.0.0.1` rather than `localhost`: Node's `fetch` resolves the latter to IPv6 and the
+server binds IPv4.
 
 ---
 
-## Testing
+## Documentation
 
-```bash
-npm test                                   # no external dependencies
-node scripts/load-test.mjs --jobs 1 --base http://127.0.0.1:3000   # baseline
-node scripts/load-test.mjs --jobs 3 --base http://127.0.0.1:3000   # concurrency
-```
-
-Run `--jobs 1` first: the under-load ceiling only means something relative to that
-baseline. Use `127.0.0.1` rather than `localhost` — Node's `fetch` resolves the
-latter to IPv6, and the server binds IPv4.
-
-### What has actually been verified
-
-Against a live stack (API + workers + Redis), with the stub providers:
-
-| Check | Result |
+| | |
 |---|---|
-| `POST` returns `job_id` immediately, non-blocking | ✅ slowest POST 0.0s |
-| Full job: PDF in → MP4 + SRT + traceability out | ✅ 720p24 H.264/AAC, downloadable |
-| 3 and 6 concurrent jobs | ✅ 3/3 and 6/6, distinct artifacts |
-| Nothing rejected under load | ✅ excess queues, never 4xx |
-| `--scale worker=N` raises throughput | ✅ verified at N=2 |
-| Chaos: `SIGKILL` a worker mid-job | ✅ reclaimed and **resumed** from the checkpoint |
-| Cancellation mid-pipeline | ✅ `cancelled` at every stage tested |
-| Idempotency-Key | ✅ 202 → 200 replay, 409 on payload change |
-| `UNSUPPORTED_FORMAT` / structured errors | ✅ correct code and detail |
-| Per-job cost metadata, no student content | ✅ `$0.0139`/video-min |
-
-The resume is the one worth calling out: a killed worker's job restarts on a
-different process and skips every completed stage, so no LLM or TTS call is paid
-for twice.
-
-The suite covers the pure policies most heavily — they encode the brief's actual
-requirements (duration bounds, subtitle drift, retry budgets, source precedence) and
-have no I/O to mock. Also covered: the job state machine, the SSRF guard, archive-bomb
-limits, HTML sanitisation, checkpoint resume, and the API contract.
+| [`docs/api-contract.md`](docs/api-contract.md) | Request and response shapes, error codes |
+| [`docs/workflow.md`](docs/workflow.md) | A request's full path, stage by stage |
+| [`docs/architecture.md`](docs/architecture.md) | How the system is put together, and why |
+| [`docs/scene-contract.md`](docs/scene-contract.md) | What a board may contain and how it animates |
+| [`docs/whiteboard-style.md`](docs/whiteboard-style.md) | The visual language and its design tokens |
+| [`docs/judge-rubric.md`](docs/judge-rubric.md) | What the quality gates check, and what they don't |
+| [`plan.md`](plan.md) | Original design rationale and decision log |
 
 ---
 
 ## Known limitations
 
-- **The quality judge is a stub that passes everything.** Nothing it reports is a
-  measurement until M7.
-- **20-job concurrency is not verified.** `plan.md` §11 is explicit about this: the
-  local checks cover isolation, queueing, requeue-on-kill and `--scale`, at 3 and 6
-  jobs. The brief's 20-job criterion needs hardware this has not been run on, and
-  the numbers above are with stub providers — real LLM and TTS latency will change
-  the per-job wall time substantially.
+Worth knowing before you rely on any of this:
+
+- **The quality judge has never been calibrated.** Its gates are reasoned, not validated
+  against human scoring, and the 1–5 holistic score means whatever the model means by it. The
+  pipeline cannot currently tell you whether a change improved quality.
+- **Nothing judges the finished video.** Every assessment is a still frame of a board. Reveal
+  timing, draw order and audio sync drift are structurally invisible to it.
+- **With `LLM_DRIVER=stub` the judge passes everything.** It exists to exercise the pipeline
+  shape; nothing it reports on a stub run is a measurement.
 - **Local storage does not expire URLs.** `presignedUrl` returns a plain URL — there is
   nothing to sign. The `presignTtlSeconds` promise becomes real with a hosted adapter.
-- **Audio- and image-only jobs report `INSUFFICIENT_CONTENT`** unless a real STT or
-  vision driver is configured. This is correct behaviour for a stub that reads
-  nothing, not a bug.
-- **Layout is measured, and a board cannot overlap by construction.** The model describes
-  each board — nodes, edges, labels, no coordinates — and the renderer lays it out with
-  grid and flex, so overlap is not expressible. Overlap, clipping and text size are then
-  measured off the laid-out page as a template-regression guard. This reversed an earlier
-  decision to let the vision judge answer them, which a real run disproved: a board whose
-  centre box covered its neighbour passed all five gates with a holistic 4.
-- **The judge has never been calibrated.** Its gates are reasoned, not validated against
-  human scoring, and the 1–5 holistic score means whatever the model means by it. So the
-  pipeline cannot tell you whether a change improved quality, and neither can its output.
-  `docs/judge-rubric.md` has the procedure; it has not been run.
-- **There is no end-to-end video judge.** The stage that was meant to score the finished
-  video was removed: it ran before subtitles existed and was called with no frames, so it
-  scored the prompt text alone at full price. Scene-level judging from real screenshots
-  (Stage B) is what assesses visual quality today. See `docs/judge-rubric.md`.
-- **OpenAI TTS timings are recovered, not authoritative.** Its adapter transcribes its own
-  audio to recover word timings — a second billed call, metered into the `tts` line.
-  `elevenlabs` reports alignment with the audio and is strictly stronger.
-- Cost figures use estimated provider prices. Real numbers need an invoice (M1).
+- **Audio- and image-only jobs report `INSUFFICIENT_CONTENT`** unless a real STT or vision
+  driver is configured. That is correct behaviour for a stub that reads nothing, not a bug.
+- **Concurrency is verified at 3 and 6 jobs**, not at 20. Isolation, queueing, requeue-on-kill
+  and `--scale` are all exercised; the numbers were taken with stub providers, and real model
+  latency changes per-job wall time substantially.
+- **There is no per-caller rate limiting.** Excess load queues rather than erroring, so no
+  `429` is ever returned. Add one at the gateway if you need it.
+- **Cost figures use estimated provider prices.** Real numbers need a real invoice.

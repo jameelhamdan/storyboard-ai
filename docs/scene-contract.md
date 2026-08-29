@@ -1,4 +1,4 @@
-# Scene Contract
+# Board Contract
 
 What a board is, how it is timed, and what may appear on it.
 
@@ -9,25 +9,54 @@ wrote its own positions, nothing in the system measured the result, and a board 
 covered the label beside it passed every quality gate.
 
 The pattern gallery that used to live here is gone with it. It documented markup a model was expected
-to imitate; the twelve templates are the contract now, and
+to imitate; the thirteen templates are the contract now, and
 `test/integration/diagram-layout.test.ts` renders every one of them in a real browser and asserts
 nothing overlaps, nothing clips and nothing falls below the legibility floor.
 
 ---
 
-## 1. The contract
+## 1. A board, and the scenes on it
 
-A scene's board is described, not drawn:
+**A board is one diagram and the consecutive scenes narrated over it.** Most boards span more than
+one: the diagram is laid out once, in full, and revealed a **step** at a time — step *N* arrives while
+the *N*th scene is spoken, takes the focus, and everything already drawn stays on screen and recedes.
+
+That is the whole point. A video whose every scene wipes to a fresh board makes the viewer rebuild the
+context each time; a board that grows keeps the thing being explained in view while the narration
+walks around it. A board of one scene behaves exactly as a scene did before boards existed.
+
+The script stage decides where boards break, by marking a scene `continuesBoard`. Two rules override
+that mark, and `groupIntoBoards` is where both live:
+
+- **The shapes must agree.** A board is one diagram; a scene cannot continue a `flow` as a `matrix`.
+- **A board may not have more steps than its shape has room for.** Every step must add at least one
+  node or edge, and a shape's node limit is for the *whole board* — so `focus` (one node) is always a
+  single scene and `comparison` (two) holds at most two.
+
+**The node budget does not grow with the build.** A shape's limit is a layout constraint — what fits
+without crowding — so a four-node `flow` narrated over three scenes is still four nodes. The steps
+decide *when* parts arrive, not how many there are.
+
+A step changes an element's `visibility` and never its box, so **the board's geometry is identical at
+every step**. That is what lets the collision and legibility checks measure a board once and have the
+answer hold for the whole build.
+
+---
+
+## 2. The contract
+
+A board is described, not drawn:
 
 ```ts
 {
-  shape: 'cycle',                     // one of twelve, chosen by the script stage
+  shape: 'cycle',                     // one of thirteen, chosen by the script stage
   title: 'Charging and discharging are one loop',
+  steps: 2,                           // one per scene on this board
   nodes: [
-    { id: 'cat', label: 'Cathode', anchor: 'Charging moves' },
-    { id: 'an',  label: 'Anode',   anchor: 'lithium one way' },
+    { id: 'cat', label: 'Cathode', anchor: 'Charging moves',   step: 1 },
+    { id: 'an',  label: 'Anode',   anchor: 'lithium one way',  step: 2 },
   ],
-  edges: [{ from: 'cat', to: 'an', label: 'charging' }],
+  edges: [{ from: 'cat', to: 'an', label: 'charging', step: 2 }],
   caption: 'The cell arrives back where it started.',
 }
 ```
@@ -40,11 +69,18 @@ A scene's board is described, not drawn:
   Pexels for photographs. The found image is resized, re-encoded and **inlined as a `data:` URI**,
   because the renderer aborts every request whose scheme is not `data:` and a remote URL would
   render as nothing. Its nodes become callouts pointing into the picture, and the credit line under
-  it is a licence obligation rather than decoration. See §6.
+  it is a licence obligation rather than decoration. See §7.
 - **`nodes` / `edges`** are validated by `SceneDiagram`: ids resolve, counts sit inside the shape's
-  `SHAPE_LIMITS`, labels are short enough to be labels, at most one node is emphasised. A diagram
-  that violates any of it is rejected rather than repaired, because the retry path exists to ask
-  properly.
+  `SHAPE_LIMITS`, labels are short enough to be labels, every step from 1 to `steps` adds something,
+  and at most one node is emphasised **per step**. A diagram that violates any of it is rejected
+  rather than repaired, because the retry path exists to ask properly.
+- **`step`** is which part of the build an element belongs to. It is also a *hard gate on
+  visibility*: an element never inks before its step, whatever its anchor resolved to. An anchor that
+  fails to match inherits the previous element's time, and without the gate that could put a step-3
+  node on screen during step 1 — giving the ending away. The gate bounds a missed anchor to
+  mistiming within its own step.
+- **`emphasis` is per step**, not per board, because the focus is exactly what moves as the
+  explanation advances.
 - **No positions, no sizes, no colours, no CSS.** Overlap is not something to detect; it is something
   the format cannot express.
 
@@ -52,7 +88,7 @@ Everything else — the frame, the palette, the type scale, the stroke weight �
 
 ---
 
-## 2. Timing — word-anchored
+## 3. Timing — word-anchored
 
 The model never writes a time. It writes **which phrase in the narration** an element appears on, and
 the renderer resolves that against the TTS word timings.
@@ -70,16 +106,24 @@ what they always did — only who writes them changed.
 | Attribute | Meaning |
 |---|---|
 | `id` | On every anchorable element. How the renderer finds it to stamp a time on. |
-| `data-on` | Reveal when this phrase is spoken. Must be a **verbatim substring** of this scene's narration. |
+| `data-on` | Reveal when this phrase is spoken. Must be a **verbatim substring** of the narration of the element's **own step**. |
+| `data-step` | Which step of the build the element belongs to. Stamped on every element of a built board, omitted entirely on a single-step one. |
 
 **Resolution rules:**
 
 1. Phrase match is case-insensitive and whitespace-normalised.
 2. A repeated phrase resolves to its **first** occurrence.
 3. An unmatched phrase inherits the previous element's time and records a warning. More than one
-   unmatched anchor per scene fails the scene.
-4. No `data-on` means visible from scene start.
+   unmatched anchor *within a scene's own step* fails the board.
+4. No `data-on` means visible from the start of the element's step.
 5. Reveal order is resolved time, not document order — an impossible sequence cannot be authored.
+6. **A step never inks early**, whatever rule 3 resolved to. The gate is absolute.
+
+**Each scene resolves only its own step's anchors**, against its own measured word timings — those
+phrases appear in that scene's narration and nowhere else. The page, however, spans the whole board
+and is seeked on the *board's* clock, so the resolved times are rebased by the scene's offset within
+the board before they are stamped. Getting that wrong fails nothing; it draws the right element at
+the wrong moment.
 
 > **The narration you receive is already the spoken form.** Numerals, symbols and abbreviations are
 > expanded to how they will be pronounced (`50%` → `fifty percent`) *before* this stage, so the text
@@ -89,7 +133,7 @@ what they always did — only who writes them changed.
 
 ---
 
-## 3. Motion
+## 4. Motion
 
 Anchored elements rise and fade as they arrive. That is the default and it is automatic.
 
@@ -115,16 +159,29 @@ the same `d`, so they draw with the shaft — see `render/diagram/connectors.ts`
 document order, so a list arrives in sequence rather than as a block. Automatic — the offset is
 computed when the document is built, so it is identical on every render.
 
-**Scenes cross-fade** into one another over a short window at each boundary. Those frames are the
-only ones in the video that are not either a reveal or a still, and each has to be drawn — which is
-why the window is short.
+**The focus moves between steps.** When a step ends, everything in it recedes — desaturating and
+giving up some contrast over roughly twice `motion.reveal_ms` — while the arriving step stays at full
+ink. Expressed as a CSS `filter` rather than by overriding `opacity` or `color`, so it composes with
+whatever reveal rule the element already uses instead of fighting eight of them in turn.
 
-Everything holds still once it has arrived. Nothing drifts, pulses or loops. All of it is a pure
-function of the frame number: a segment re-rendered on another worker is pixel-identical.
+Elements keep their position and their box throughout. Nothing reflows as a board builds.
+
+**Boards cross-fade** into one another over a short window at each boundary — a dip: the outgoing
+board fades down to the background and the incoming one fades up from it, since only one document is
+ever loaded. Those frames are the only ones in the video that are neither a reveal nor a still, and
+each has to be drawn, which is why the window is short.
+
+**Boards, not scenes.** A wipe means *new diagram*. Inside a board nothing fades, because the
+continuity is the point — which is also why a board narrated over four scenes now pays for one
+transition rather than four.
+
+Everything holds still once it has arrived and stopped receding. Nothing drifts, pulses or loops. All
+of it is a pure function of the frame number: a segment re-rendered on another worker is
+pixel-identical.
 
 ---
 
-## 4. Legibility
+## 5. Legibility
 
 Non-negotiable, because the output is 720p and may be watched on a phone.
 
@@ -141,7 +198,7 @@ Non-negotiable, because the output is 720p and may be watched on a phone.
 
 ---
 
-## 5. Grounding
+## 6. Grounding
 
 - **Every visible word must be faithful to the source.** A label is one to four words, so it is
   necessarily shorter than the sentence it came from — shortening is not paraphrasing, and "the
@@ -159,7 +216,7 @@ Non-negotiable, because the output is 720p and may be watched on a phone.
 
 ---
 
-## 6. Found images
+## 7. Found images
 
 `illustration` exists because some subjects are their appearance. What a mitral valve, an
 oscilloscope trace or a basalt column actually looks like is the thing being taught, and a

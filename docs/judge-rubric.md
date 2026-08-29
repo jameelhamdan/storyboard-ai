@@ -1,6 +1,6 @@
 # Judge Rubric
 
-Replaces the brief's "assessed by Saman" with something reproducible. Two stages, cheapest first.
+Replaces subjective sign-off with something reproducible. Two stages, cheapest first.
 Only Stage B uses a model; Stage A is deterministic and free.
 
 ---
@@ -15,7 +15,7 @@ they cost one extra evaluation and no extra page load. See
 | # | Check | Fails when |
 |---|---|---|
 | A1 | Markup validity | Anything the sanitizer objects to, or not exactly one `sc-title` |
-| A3 | Anchor resolution | More than one `data-on` phrase per scene fails to match the narration |
+| A3 | Anchor resolution | More than one of **this scene's own step's** anchor phrases fails to match its narration. A board's markup carries every step's phrases, and step 2's are verbatim from scene 2 and appear nowhere in scene 1 — so checking the whole document against one scene failed every built board on anchors that were correct |
 | A4 | Overflow | Any inked element lies outside the frame, or the board had to be scaled to fit |
 | A5 | Legibility floor | Computed font size below `theme.type.min_rem` |
 | A6 | Collision | Two inked elements' rendered boxes intersect by more than a pixel |
@@ -38,25 +38,39 @@ they cost one extra evaluation and no extra page load. See
 > format can express. A check that cannot fail is worse than no check, because it reads as coverage.
 > The guarantee is asserted instead in `test/unit/scene-diagram.test.ts`.
 
-A scene failing any Stage A check is regenerated **without a model call being spent on judging it**.
+A board failing any Stage A check is regenerated **without a model call being spent on judging it**.
 That is most of why the judge stopped dominating the bill: a board with a collision in it is going to
 be regenerated whatever a model thinks of its wording.
 
 ---
 
-## Stage B — scene judge (vision, per scene attempt)
+## Stage B — board judge (vision, per board attempt)
 
-Runs on one screenshot of the finished scene, on the **quality tier**. Four binary gates decide pass
-or regenerate; one holistic score is reported and never gates.
+Runs on the **quality tier**, once per board, carrying **one screenshot per step of the build**.
+Four binary gates decide pass or regenerate; one holistic score is reported and never gates.
+
+**The unit is the board, not the scene.** A board's scenes share one diagram, so every gate below has
+one answer for the whole thing — asking per scene sent the rubric, the source excerpt and the gate
+definitions once per scene to review a single picture. On the run in `out/20260828-152720-heart` that
+was $0.177 of a $0.390 video, 45% of the bill, and most of it was repetition.
+
+The images are the board as the viewer meets it: the first is the board after step 1, the last is the
+finished board. That sequence is what makes "did this part arrive when the narration needed it"
+answerable at all — a built board judged from its final frame alone cannot be assessed for pacing,
+because every element is present there by definition.
+
+A verdict is capped at 400 output tokens. It had no ceiling and was writing ~1,220 per call on the
+quality tier; what the caller consumes is four booleans, a short note on each failing gate, and one
+number.
 
 ### Gating criteria
 
 | # | Name | The question | Fails when |
 |---|---|---|---|
 | **G1** | Grounding | Is every visible word faithful to the cited source? | A label states something the source does not — a different claim, an invented figure, a term the material never introduces, or a compression that changes the meaning |
-| **G2** | Fit | Does the picture express a relationship the narration **states**? | An edge claims a connection the source did not state. Proximity in the text is not a stated relationship |
+| **G2** | Fit | Does the picture express a relationship the narration **states**, and does each part arrive when its step explains it? | An edge claims a connection the source did not state (proximity in the text is not a stated relationship); or a step adds something its narration never mentions, or explains something not on screen until a later image |
 | **G3** | Completeness | Is every key term the narration foregrounds actually on screen? | The narration names a concept as central and nothing on screen shows it |
-| **G4** | Composition | Does the board read well as a picture? | No clear focal point, clutter that carries no meaning, or emphasis on the wrong element |
+| **G4** | Composition | Does the board read well as a picture, at every step? | No clear focal point, clutter that carries no meaning, emphasis on the wrong element, or a board that was legible at step 1 and is a thicket by step 4 |
 
 A scene passes only if **all four pass**. Each failing gate returns its own note, so the regeneration
 prompt is told what to fix rather than asked to try again.
@@ -100,13 +114,15 @@ into word windows, which was never itself judged and produced labels like "catho
 of five scenes in the battery run shipped that way, and the board they replaced was better than what
 replaced it.
 
-The synthetic board remains, for the one case it is actually for: a scene where **no** attempt
-produced anything renderable. It is a `focus` diagram stating the scene's opening sentence. More than
-`judge.maxFallbackScenes` of those fails the job with `GENERATION_FAILED`.
+The synthetic board remains, for the one case it is actually for: a board where **no** attempt
+produced anything renderable. The board dissolves — each of its scenes gets its own `focus` diagram
+stating its opening sentence — because there is no shared picture left to build on. More than
+`judge.maxFallbackScenes` of those fails the job with `GENERATION_FAILED`, counted in **scenes**
+rather than boards, since a board that fell back took all of its scenes with it.
 
 ### Concurrency
 
-Scenes are judged concurrently under `concurrency.judge`. They used to run serially, and the reason
+Boards are judged concurrently under `concurrency.judge`. They used to run serially, and the reason
 was never the judging — it was a stage-level fallback counter that every scene read and wrote, which
 would have made *which* scene tripped the limit depend on timing. The budget is checked once at the
 end over the finished set, so the loop has no shared state left.
@@ -133,9 +149,10 @@ Restoring it means three things, in this order:
 3. Calibrate it the way Stage B should be calibrated below.
 
 **Nothing in this pipeline judges the finished video, or judges animation over time.** Every
-assessment is one static frame per scene attempt. Reveal timing, draw order and sync drift are
-structurally invisible to the judge — A3 is the only thing standing behind them, and it only checks
-that anchor phrases exist in the narration.
+assessment is a still frame. Stage B does now see one frame per step, so the *order* a board builds in
+is gated by G2 — but reveal timing within a step, draw order and audio sync drift remain structurally
+invisible. A3 is the only thing standing behind those, and it only checks that anchor phrases exist in
+the narration.
 
 ---
 

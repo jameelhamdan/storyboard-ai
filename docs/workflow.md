@@ -209,7 +209,7 @@ Two details that took a bug each to get right:
   un-terminalise a job.**
 
 **Cost ceiling.** Checked at every stage boundary, not inside stages: a runaway regeneration loop is
-the realistic way a job burns money, and the retry budget alone bounds retries per scene rather than
+the realistic way a job burns money, and the retry budget alone bounds retries per board rather than
 total spend. It *fails* the job rather than degrading it — a job already over its ceiling and only
 part-way through will not get cheaper by continuing.
 

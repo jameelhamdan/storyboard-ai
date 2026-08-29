@@ -131,5 +131,6 @@ committing — legibility at size is the only criterion that matters here.
 - **An unconstrained palette** — the accent set is capped at four and chosen once per video, not per
   scene. See rule 1 for why the "one accent" rule was relaxed rather than removed.
 
-Each of these is a deliberate omission rather than an oversight. If Saman wants the drawing hand at
-M1 review, it is additive work on top of a working renderer, not a change to the model.
+Each of these is a deliberate omission rather than an oversight, and each is additive work on top of
+a working renderer rather than a change to the model — so any of them can be reconsidered later
+without unpicking anything.
