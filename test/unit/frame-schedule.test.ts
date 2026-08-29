@@ -37,7 +37,7 @@ const scene = (index: number, ms: number, revealsAtMs: number[] = []) => {
   if (revealsAtMs.length === 0) return base;
 
   const anchors = revealsAtMs.map((_, i) => ({
-    elementId: `s${index}-p${i}`, phrase: words[i]!, draw: 'normal' as const, hold: true,
+    elementId: `s${index}-p${i}`, phrase: words[i]!, draw: 'normal' as const,
   }));
   const timings = revealsAtMs.map((at, i) =>
     WordTiming.of(words[i]!, at, at + 200));

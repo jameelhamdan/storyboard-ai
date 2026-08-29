@@ -113,7 +113,7 @@ export class GenerationPipeline {
   }
 
   /**
-   * The per-job circuit breaker (plan.md §1, §7).
+   * The per-job circuit breaker.
    *
    * Checked at stage boundaries rather than inside stages: a runaway
    * regeneration loop is the realistic way a job burns money, and the retry

@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import type { JobId } from '@domain/job/JobId.js';
 
 /**
- * A job-scoped *shared* namespace, not a local directory (plan.md §4).
+ * A job-scoped *shared* namespace, not a local directory.
  *
  * BullMQ requeues a dead worker's job to any worker, so a checkpoint written to
  * one container's /tmp does not exist in the next. Same for split rendering: the

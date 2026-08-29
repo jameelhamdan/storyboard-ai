@@ -1,7 +1,7 @@
 # API Contract
 
 Conventional REST. Nothing clever: `snake_case` JSON, ISO-8601 timestamps, standard status codes,
-one error envelope everywhere. Paths follow the brief (`POST /generate`, `GET /status/{job_id}`).
+one error envelope everywhere.
 
 Base: `/v1`. OpenAPI is generated from the Fastify route schemas and served at `/docs`.
 
@@ -267,7 +267,7 @@ Every non-2xx response, without exception:
 | `SERVICE_UNAVAILABLE` | 503 | A dependency (Redis) is unreachable. Retryable — distinct from `INTERNAL_ERROR`, which is not |
 | `INTERNAL_ERROR` | 500 | Unhandled |
 
-The three codes the brief names are all present. `GENERATION_FAILED` is deliberately not an HTTP
+`GENERATION_FAILED` is deliberately not an HTTP
 status — the request succeeded, the job failed, and it is reported through `GET /status`.
 
 ## Job states

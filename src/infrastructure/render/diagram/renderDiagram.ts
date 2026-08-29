@@ -85,7 +85,6 @@ function anchorsIn(html: string): TimelineAnchor[] {
       elementId: match[1]!,
       phrase: phrase || undefined,
       draw: 'normal' as const,
-      hold: true,
       step: Number.isFinite(step) && step >= 1 ? step : 1,
     };
   });

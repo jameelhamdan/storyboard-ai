@@ -10,7 +10,7 @@ import type { OnStageComplete } from '@application/pipeline/GenerationPipeline.j
  *
  * Horizontally scalable: `docker compose up --scale worker=N` starts N of these
  * against the same queue. Concurrency *within* a worker is WORKER_CONCURRENCY
- * (brief §5 names it as .env-configurable); parallelism *across* workers is
+ * (.env-configurable); parallelism *across* workers is
  * --scale. Both matter — the first fills I/O wait, the second uses more cores.
  */
 const config = loadConfig();

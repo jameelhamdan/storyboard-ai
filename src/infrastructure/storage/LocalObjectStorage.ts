@@ -4,7 +4,7 @@ import type { ObjectStoragePort, StoredObject } from '@application/port/ObjectSt
 
 /**
  * Local filesystem, served over HTTP by the API. The default while there is no
- * deployment target (plan.md §1) — S3ObjectStorage is the same port, so the swap
+ * deployment target — S3ObjectStorage is the same port, so the swap
  * is a container binding.
  */
 export class LocalObjectStorage implements ObjectStoragePort {

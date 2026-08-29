@@ -4,8 +4,7 @@ export type VoiceGender = 'female' | 'male';
 
 /**
  * The slot is ours and stable; the provider voice id behind it comes from .env
- * (brief §4 names VOICE_EN_FEMALE_1 style keys explicitly), so swapping a voice
- * never touches code.
+ * as a VOICE_EN_FEMALE_1 style key, so swapping a voice never touches code.
  */
 export class VoiceProfile {
   private constructor(

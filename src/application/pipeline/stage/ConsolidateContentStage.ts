@@ -11,7 +11,7 @@ export interface EmbeddingPort {
 }
 
 /**
- * The brief allows any combination of inputs in one request, and those inputs
+ * Any combination of inputs may arrive in one request, and those inputs
  * routinely overlap — lecture slides plus a recording of that same lecture, or a
  * PDF plus photos of its pages. Without this step the script narrates the same
  * material twice.

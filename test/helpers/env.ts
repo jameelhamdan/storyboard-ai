@@ -15,7 +15,7 @@ export function testEnv(overrides: Record<string, string> = {}): NodeJS.ProcessE
     STORAGE_PUBLIC_BASE_URL: 'http://127.0.0.1:3000/artifacts',
     WORKSPACE_DIR: '.workspace/test-jobs',
 
-    // Voice ids live in .env by design (brief §4); the loader requires all four.
+    // Voice ids live in .env by design; the loader requires all four.
     VOICE_EN_FEMALE_1: 'test-en-female',
     VOICE_EN_MALE_1: 'test-en-male',
     VOICE_ES_FEMALE_1: 'test-es-female',

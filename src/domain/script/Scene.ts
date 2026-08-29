@@ -107,13 +107,4 @@ export class Scene {
       false, html, timeline, this.estimatedDuration, this.measuredDuration, this.wordTimings, true,
     );
   }
-
-  /** The same scene, told whether it opens a board or continues one. */
-  public withBoardContinuation(continuesBoard: boolean): Scene {
-    return new Scene(
-      this.index, this.spokenText, this.writtenText, this.sourcedText, this.citations, this.visualIntent,
-      continuesBoard, this.html, this.timeline, this.estimatedDuration, this.measuredDuration,
-      this.wordTimings, this.usedFallbackComponent,
-    );
-  }
 }

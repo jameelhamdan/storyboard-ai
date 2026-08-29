@@ -29,7 +29,7 @@ export interface LoadedConfig {
 
 /**
  * Layered config: YAML carries behavioural spec, .env carries secrets and the two
- * knobs the brief names. Everything is validated here so no code below
+ * knobs .env owns. Everything is validated here so no code below
  * interfaces/ ever parses YAML or reads process.env.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): LoadedConfig {
@@ -58,7 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): LoadedConfig {
     const providerVoiceId = env[v.envVar];
     if (!providerVoiceId) {
       throw new Error(
-        `Voice slot '${slot}' needs ${v.envVar} set. Voice ids live in .env by design (brief §4) — see .env.example.`,
+        `Voice slot '${slot}' needs ${v.envVar} set. Voice ids live in .env by design — see .env.example.`,
       );
     }
     voices.set(slot, VoiceProfile.of({
@@ -109,7 +109,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): LoadedConfig {
     throw new Error(`styles.yaml names '${stylesFile.default}' as the default, but no such style is defined.`);
   }
 
-  // .env wins where the brief names it; YAML is the fallback default.
+  // .env wins for the two knobs it owns; YAML is the fallback default.
   const queue = {
     maxDepth: parsedEnv.QUEUE_MAX_DEPTH ?? raw.queue.maxDepth,
     workerConcurrency: parsedEnv.WORKER_CONCURRENCY ?? raw.queue.workerConcurrency,

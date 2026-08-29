@@ -1,8 +1,8 @@
 import { DomainError, type DomainErrorCode } from './DomainError.js';
 
 /**
- * Carries the specific reason rather than a bare rejection — the brief requires
- * StudyCore be able to surface *why* an input was refused.
+ * Carries the specific reason rather than a bare rejection, so a caller can be
+ * told *why* an input was refused rather than only that it was.
  */
 export class UnsupportedFormatError extends DomainError {
   public readonly code: DomainErrorCode = 'UNSUPPORTED_FORMAT';

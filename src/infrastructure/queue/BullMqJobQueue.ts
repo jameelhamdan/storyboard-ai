@@ -6,7 +6,7 @@ import type { JobId } from '@domain/job/JobId.js';
 export const GENERATION_QUEUE = 'generation';
 
 /**
- * BullMQ over Redis. A proper job queue as brief §5 requires — no threading hacks,
+ * BullMQ over Redis. A proper job queue — no threading hacks,
  * no in-memory queue.
  *
  * `attempts` is set from config so a worker that dies mid-job has its job requeued
@@ -60,7 +60,7 @@ export class BullMqJobQueue implements JobQueuePort {
     };
   }
 
-  /** Graceful degradation: over capacity we queue, never reject (brief §5). */
+  /** Graceful degradation: over capacity we queue, never reject. */
   public async isOverCapacity(): Promise<boolean> {
     const { waiting, delayed } = await this.depth();
     return waiting + delayed >= this.options.maxDepth;

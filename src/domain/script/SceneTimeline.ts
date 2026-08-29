@@ -12,7 +12,6 @@ export interface TimelineAnchor {
   readonly elementId: string;
   readonly phrase: string | undefined;
   readonly draw: DrawSpeed;
-  readonly hold: boolean;
   /**
    * Which step of the board's build this element belongs to, 1-based.
    *
@@ -33,7 +32,6 @@ export interface ResolvedReveal {
   readonly elementId: string;
   readonly at: Duration;
   readonly draw: DrawSpeed;
-  readonly hold: boolean;
   /** True when the phrase did not match and the documented fallback was applied. */
   readonly fallback: boolean;
 }
@@ -81,7 +79,7 @@ export class SceneTimeline {
       }
 
       previous = at;
-      reveals.push({ elementId: anchor.elementId, at, draw: anchor.draw, hold: anchor.hold, fallback });
+      reveals.push({ elementId: anchor.elementId, at, draw: anchor.draw, fallback });
     }
 
     reveals.sort((a, b) => a.at.ms - b.at.ms);

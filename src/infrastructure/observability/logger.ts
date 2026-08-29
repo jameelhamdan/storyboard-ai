@@ -3,7 +3,7 @@ import { pino, type Logger } from 'pino';
 
 /**
  * Redaction is configured here rather than left to call sites, because "no
- * logging of raw student content" (brief §4) cannot depend on every future log
+ * logging of raw student content" cannot depend on every future log
  * statement remembering. Paths come from config so a new content-carrying field
  * is a config edit, not a code change.
  */

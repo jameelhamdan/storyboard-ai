@@ -1,4 +1,4 @@
-# `docker-compose up` is the only setup step beyond .env (brief §FR-11).
+# `docker-compose up` is the only setup step beyond .env.
 #
 # Scale workers with:  docker compose up --scale worker=4
 # Throughput rises with N up to the host's core count.
@@ -31,7 +31,7 @@ services:
     volumes:
       # The shared workspace. Both services mount it at the same path, which is
       # what lets a job queued by the API be picked up by any worker, and a
-      # requeued job resume on a different worker than started it (plan.md §4).
+      # requeued job resume on a different worker than started it.
       - workspace:/workspace
     depends_on:
       redis:
@@ -57,7 +57,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     deploy:
-      # Brief §5 requires per-worker CPU and memory limits so one heavy job
+      # Per-worker CPU and memory limits, so one heavy job
       # cannot starve the others. Rendering is the CPU-hungry stage; 2 cores and
       # 4GB is sized for 720p24 with WORKER_CONCURRENCY=2.
       resources:

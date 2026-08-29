@@ -114,19 +114,6 @@ describe('a board\'s clock', () => {
     expect(board.duration.ms).toBe(4000 + 350 + 6000 + 350 + 5000);
   });
 
-  /**
-   * The gap belongs to the step that just ended, matching `data-step-starts` and
-   * the renderer's own frame lookup — so the board holds rather than advancing
-   * its focus during the silence between two scenes.
-   */
-  it('reports the step being narrated at a given moment', () => {
-    expect(board.stepAt(0)).toBe(1);
-    expect(board.stepAt(4000)).toBe(1);
-    expect(board.stepAt(4349)).toBe(1);
-    expect(board.stepAt(4350)).toBe(2);
-    expect(board.stepAt(11000)).toBe(3);
-    expect(board.stepAt(999_999)).toBe(3);
-  });
 
   /**
    * The join that makes a shared document work. Each scene resolves its anchors
@@ -138,14 +125,14 @@ describe('a board\'s clock', () => {
     const withTimings = [
       scene(0, { text: 'alpha beta', ms: 4000 })
         .withStoryboard('<div id="a"></div>', SceneTimeline.unresolved([
-          { elementId: 'a', phrase: 'alpha', draw: 'normal', hold: true, step: 1 },
+          { elementId: 'a', phrase: 'alpha', draw: 'normal', step: 1 },
         ]))
         .withMeasuredAudio(Duration.fromMs(4000), [
           WordTiming.of('alpha', 1000, 1500), WordTiming.of('beta', 1500, 2000),
         ]),
       scene(1, { text: 'gamma delta', ms: 6000, continues: true })
         .withStoryboard('<div id="b"></div>', SceneTimeline.unresolved([
-          { elementId: 'b', phrase: 'gamma', draw: 'normal', hold: true, step: 2 },
+          { elementId: 'b', phrase: 'gamma', draw: 'normal', step: 2 },
         ]))
         .withMeasuredAudio(Duration.fromMs(6000), [
           WordTiming.of('gamma', 500, 900), WordTiming.of('delta', 900, 1400),

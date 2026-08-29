@@ -191,7 +191,7 @@ export const themeConfigSchema = z.object({
 });
 
 /**
- * .env carries secrets and deployment endpoints only — plus the two knobs brief §5
+ * .env carries secrets and deployment endpoints only — plus the two knobs
  * names explicitly and verifies as an acceptance criterion.
  */
 export const envSchema = z.object({
@@ -202,7 +202,7 @@ export const envSchema = z.object({
 
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
-  // Brief §5: "Queue depth and worker count configurable via .env — verified"
+  // Queue depth and worker count are configurable via .env.
   QUEUE_MAX_DEPTH: z.coerce.number().int().positive().optional(),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().optional(),
 
@@ -315,7 +315,7 @@ export const envSchema = z.object({
    */
   CHROMIUM_PATH: z.string().optional(),
 
-  // Voice slot -> provider voice id. Brief §4 names these keys explicitly.
+  // Voice slot -> provider voice id, so swapping a voice never touches code.
   VOICE_EN_FEMALE_1: z.string().default('21m00Tcm4TlvDq8ikWAM'),
   VOICE_EN_MALE_1: z.string().default('pNInz6obpgDQGcFmaJgB'),
   VOICE_ES_FEMALE_1: z.string().default('EXAVITQu4vr4xnSDxMaL'),

@@ -112,13 +112,4 @@ export class Storyboard {
   public windowFor(sceneIndex: number): SceneWindow | undefined {
     return this.windows.find((w) => w.sceneIndex === sceneIndex);
   }
-
-  public boardWindowFor(boardIndex: number): BoardWindow | undefined {
-    return this.boardWindows.find((w) => w.boardIndex === boardIndex);
-  }
-
-  /** The board a scene belongs to, for a caller holding only a scene index. */
-  public boardForScene(sceneIndex: number): Board | undefined {
-    return this.boards.find((b) => b.sceneIndexes.includes(sceneIndex));
-  }
 }

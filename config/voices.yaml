@@ -1,9 +1,9 @@
-# Voice slot metadata — see plan.md §3 and §12.
-# Brief §4 names .env explicitly for voice ids, so the provider voice id for each
+# Voice slot metadata.
+# Voice ids belong in .env, so the provider voice id for each
 # slot lives in .env (VOICE_EN_FEMALE_1, VOICE_ES_MALE_1, ...) and this file holds
 # only the non-secret slot metadata. Swapping a voice is an .env change.
 #
-# Four slots per the brief: 1-2 female and 1-2 male, in both English and Spanish.
+# Four slots: one female and one male, in both English and Spanish.
 # All four must be approved by Saman at M1 before generation code is written.
 
 defaultByLanguage:            # FR-6: defaults to the female slot for the output language

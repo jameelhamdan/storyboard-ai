@@ -1,10 +1,10 @@
-# Behavioural configuration — see plan.md §3.
+# Behavioural configuration.
 # Every value here is overridable per environment; none is hardcoded in source.
 # Secrets and deployment endpoints live in .env, never here.
 #
-# Two exceptions read .env first with the value here as fallback, because brief §5
-# names them as .env-configurable and verifies it: queue.maxDepth (QUEUE_MAX_DEPTH)
-# and queue.workerConcurrency (WORKER_CONCURRENCY).
+# Two exceptions read .env first with the value here as fallback, because they are
+# deployment knobs rather than behaviour: queue.maxDepth (QUEUE_MAX_DEPTH) and
+# queue.workerConcurrency (WORKER_CONCURRENCY).
 
 input:
   maxRequestBytes:        524288000   # 500 MB total per request

@@ -287,14 +287,6 @@ export class SceneDiagram {
     );
   }
 
-  /** Elements arriving at `step`, nodes before edges — the order they draw in. */
-  public elementsAtStep(step: number): { nodes: readonly DiagramNode[]; edges: readonly DiagramEdge[] } {
-    return {
-      nodes: this.nodes.filter((n) => (n.step ?? 1) === step),
-      edges: this.edges.filter((e) => (e.step ?? 1) === step),
-    };
-  }
-
   /**
    * The same diagram with its picture found.
    *

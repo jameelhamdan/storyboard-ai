@@ -36,10 +36,11 @@ interface ChatCompletion {
  * we use. Retry, timeout and JSON recovery come from `llmResilience`, which is
  * separate so a second provider adapter inherits the same rules.
  *
- * Note on residency: this is a US endpoint. plan.md §5 originally required EU
- * processing; that was relaxed to "US or EU" for this project, and the Vertex
- * driver that existed to pin the region was removed. Restoring EU pinning would
- * mean bringing a region-pinnable provider back behind `LlmClientPort`.
+ * Note on residency: this is a US endpoint, with no region guarantee. An earlier
+ * requirement for EU processing was relaxed to "US or EU", and the Vertex driver
+ * that existed to pin the region was removed with it. Restoring EU pinning means
+ * bringing a region-pinnable provider back behind `LlmClientPort` — the port is
+ * unchanged, so it is a new adapter rather than a redesign.
  */
 export class OpenAiClient implements LlmClientPort {
   private readonly baseUrl: string;

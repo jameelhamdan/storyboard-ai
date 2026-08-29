@@ -133,7 +133,7 @@ export class PublishArtifactsStage implements PipelineStage<AssembledVideo, Fina
   /**
    * Token usage and spend, split by the vendor that will invoice for it.
    *
-   * Metadata only — brief §4 forbids student content in cost records, and the
+   * Metadata only — student content must never reach a cost record, and the
    * meter has no method that could accept any, so this file is structurally
    * incapable of carrying a fragment of the source.
    */

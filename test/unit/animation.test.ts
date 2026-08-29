@@ -41,8 +41,8 @@ const doc = (scene: Scene) =>
  */
 describe('reveal attributes reaching the page', () => {
   const anchors = [
-    { elementId: 'a', phrase: 'glycolysis', draw: 'slow' as const, hold: true },
-    { elementId: 'b', phrase: 'splits', draw: 'fast' as const, hold: false },
+    { elementId: 'a', phrase: 'glycolysis', draw: 'slow' as const },
+    { elementId: 'b', phrase: 'splits', draw: 'fast' as const },
   ];
   const timings = [
     WordTiming.of('glycolysis', 0, 400),
@@ -59,8 +59,8 @@ describe('reveal attributes reaching the page', () => {
   it('stamps a stagger index on elements sharing a moment, not on the first', () => {
     // Both anchor to the same word, so they resolve to the same millisecond.
     const together = [
-      { elementId: 'a', phrase: 'glycolysis', draw: 'normal' as const, hold: false },
-      { elementId: 'b', phrase: 'glycolysis', draw: 'normal' as const, hold: false },
+      { elementId: 'a', phrase: 'glycolysis', draw: 'normal' as const },
+      { elementId: 'b', phrase: 'glycolysis', draw: 'normal' as const },
     ];
     const html = doc(sceneWith('<div id="a">A</div><div id="b">B</div>', together, timings));
 

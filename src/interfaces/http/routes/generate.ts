@@ -21,7 +21,7 @@ import type { GenerateRequest } from '../dto/schemas.js';
 
 /**
  * POST /v1/generate — accepts multipart (with files) or JSON (URLs only) and
- * returns 202 + job_id immediately. The brief's own §4 requires async, which is
+ * returns 202 + job_id immediately. Generation is asynchronous, which is
  * why this returns an id rather than the video URL FR-1 describes.
  */
 export async function registerGenerateRoute(

@@ -89,8 +89,8 @@ function sceneWithDiagram(): Scene {
 </section>`;
 
   const anchors = [
-    { elementId: 'n0', phrase: 'Glycolysis', draw: 'normal' as const, hold: true },
-    { elementId: 'n1', phrase: 'pyruvate', draw: 'normal' as const, hold: true },
+    { elementId: 'n0', phrase: 'Glycolysis', draw: 'normal' as const },
+    { elementId: 'n1', phrase: 'pyruvate', draw: 'normal' as const },
   ];
   const timings = [
     WordTiming.of('Glycolysis', 0, 400),
@@ -293,7 +293,7 @@ describe.skipIf(!available)('PlaywrightSceneRenderer (needs Chromium)', () => {
            <path class="sc-arrow" id="p1" d="M4 30 C60 4, 140 56, 196 30" pathLength="1"/>
          </svg></section>`,
         SceneTimeline.unresolved([
-          { elementId: 'p1', phrase: 'pyruvate', draw: 'normal', hold: true },
+          { elementId: 'p1', phrase: 'pyruvate', draw: 'normal' },
         ]).resolve([
           WordTiming.of('glucose', 0, 400),
           WordTiming.of('becomes', 400, 800),

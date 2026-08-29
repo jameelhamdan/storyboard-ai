@@ -1,5 +1,5 @@
 /**
- * Adding a language is a config change (plan.md §12) — this list and the request
+ * Adding a language is a config change — this list and the request
  * schema enum are the only code-side touchpoints, and both are data.
  */
 export const SUPPORTED_LANGUAGES = ['en', 'es'] as const;

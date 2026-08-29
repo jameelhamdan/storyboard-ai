@@ -25,8 +25,6 @@ export interface BoardReveal {
   /** Board-relative, not scene-relative — see `reveals`. */
   readonly at: Duration;
   readonly draw: DrawSpeed;
-  readonly hold: boolean;
-  readonly fallback: boolean;
   /** Which step this element belongs to, 1-based. */
   readonly step: number;
 }
@@ -103,16 +101,6 @@ export class Board {
     throw new RangeError(`Scene ${sceneIndex} is not on board ${this.index}.`);
   }
 
-  /** Which step is being narrated at a board-relative time. */
-  public stepAt(ms: number): number {
-    let cursor = 0;
-    for (let i = 0; i < this.scenes.length; i += 1) {
-      cursor += this.scenes[i]!.duration.ms + this.interSceneGap.ms;
-      if (ms < cursor) return i + 1;
-    }
-    return this.scenes.length;
-  }
-
   /**
    * Every element's reveal, rebased onto the board's own clock.
    *
@@ -133,8 +121,6 @@ export class Board {
           elementId: reveal.elementId,
           at: offset.plus(reveal.at),
           draw: reveal.draw,
-          hold: reveal.hold,
-          fallback: reveal.fallback,
           step: step + 1,
         });
       }

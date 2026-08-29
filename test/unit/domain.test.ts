@@ -111,7 +111,7 @@ describe('Money — integer micros, because cost accumulates over ~70 calls', ()
     expect(Money.sum(cents).usd).toBe(1);
   });
 
-  it('computes per-minute cost, the unit the brief caps', () => {
+  it('computes per-minute cost, the unit the target is set in', () => {
     expect(Money.fromUsd(0.30).perMinute(600).toUsdRounded(2)).toBe(0.03);
   });
 
@@ -189,15 +189,15 @@ describe('SceneTimeline fallback rules', () => {
 
   it('reveals an unanchored element at scene start', () => {
     const resolved = SceneTimeline.unresolved([
-      { elementId: 'a', phrase: undefined, draw: 'normal', hold: true },
+      { elementId: 'a', phrase: undefined, draw: 'normal' },
     ]).resolve(timings);
     expect(resolved.reveals[0]!.at.ms).toBe(0);
   });
 
   it('inherits the previous time when a phrase does not match, and records it', () => {
     const resolved = SceneTimeline.unresolved([
-      { elementId: 'a', phrase: 'beta', draw: 'normal', hold: true },
-      { elementId: 'b', phrase: 'nonexistent', draw: 'normal', hold: true },
+      { elementId: 'a', phrase: 'beta', draw: 'normal' },
+      { elementId: 'b', phrase: 'nonexistent', draw: 'normal' },
     ]).resolve(timings);
 
     expect(resolved.reveals.find((r) => r.elementId === 'b')!.at.ms).toBe(500);
@@ -207,8 +207,8 @@ describe('SceneTimeline fallback rules', () => {
 
   it('orders reveals by resolved time, so the model cannot create an impossible sequence', () => {
     const resolved = SceneTimeline.unresolved([
-      { elementId: 'late', phrase: 'gamma', draw: 'normal', hold: true },
-      { elementId: 'early', phrase: 'alpha', draw: 'normal', hold: true },
+      { elementId: 'late', phrase: 'gamma', draw: 'normal' },
+      { elementId: 'early', phrase: 'alpha', draw: 'normal' },
     ]).resolve(timings);
 
     expect(resolved.reveals.map((r) => r.elementId)).toEqual(['early', 'late']);

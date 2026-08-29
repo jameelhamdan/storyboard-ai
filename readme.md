@@ -332,7 +332,6 @@ server binds IPv4.
 | [`docs/scene-contract.md`](docs/scene-contract.md) | What a board may contain and how it animates |
 | [`docs/whiteboard-style.md`](docs/whiteboard-style.md) | The visual language and its design tokens |
 | [`docs/judge-rubric.md`](docs/judge-rubric.md) | What the quality gates check, and what they don't |
-| [`plan.md`](plan.md) | Original design rationale and decision log |
 
 ---
 

@@ -42,9 +42,9 @@ export interface PricingTable {
 }
 
 /**
- * Accumulates per stage. Records counts and money only — never content. Brief §4
- * is explicit that cost logs must not contain student material, and the way to
- * guarantee that is for the meter to have no method that could accept any.
+ * Accumulates per stage. Records counts and money only — never content. A cost
+ * log must not contain student material, and the way to guarantee that is for the
+ * meter to have no method that could accept any.
  */
 export class CostMeter implements CostMeterPort {
   private breakdown = CostBreakdown.empty();

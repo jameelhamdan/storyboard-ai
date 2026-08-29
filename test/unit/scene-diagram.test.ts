@@ -119,7 +119,7 @@ describe('renderDiagram', () => {
     // The title always leads, with no phrase, so it lands at scene start, and
     // it belongs to step 1 — a board's heading is there from the first frame.
     expect(anchors[0]).toEqual({
-      elementId: 's2-title', phrase: undefined, draw: 'normal', hold: true, step: 1,
+      elementId: 's2-title', phrase: undefined, draw: 'normal', step: 1,
     });
     // Document order — the arrow sits between the two boxes it joins. Order here
     // does not decide what draws first; SceneTimeline resolves by time, so an

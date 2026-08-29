@@ -51,7 +51,7 @@ describe('prompt library', () => {
 
 describe('.env.example', () => {
   /**
-   * The brief requires a .env.example with every key documented. A key added to
+   * .env.example documents every key the service reads. A key added to
    * the schema but not the example is a key nobody deploying this will set.
    */
   it('documents every variable the config schema accepts', () => {

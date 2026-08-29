@@ -1,4 +1,4 @@
-/** The lifecycle drawn in plan.md §6. */
+/** The job lifecycle. */
 export const JOB_STATUSES = ['queued', 'processing', 'completed', 'failed', 'cancelled'] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 

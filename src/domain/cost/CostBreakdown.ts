@@ -1,6 +1,6 @@
 import { Money } from '../shared/Money.js';
 
-/** Metadata only, never content — brief §4 is explicit about this. */
+/** Metadata only, never content: a cost record may not carry student material. */
 /**
  * `search` is its own line rather than part of `llm`: a grounded search is
  * billed per *request*, not per token, and research is the one feature that can

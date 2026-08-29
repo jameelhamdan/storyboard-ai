@@ -1,5 +1,5 @@
 /**
- * The brief (§FR-10) names exactly three error codes. Everything the pipeline can
+ * Exactly three error codes are contractual. Everything the pipeline can
  * fail with maps onto one of them, plus the transport-level codes in the API
  * contract. One mapper in interfaces/ turns these into HTTP; no stage ever
  * constructs a response.

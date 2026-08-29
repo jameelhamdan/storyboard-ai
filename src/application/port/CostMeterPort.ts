@@ -10,7 +10,7 @@ export interface TokenUsage {
 }
 
 /**
- * Accumulates per stage. Metadata only — never content. Brief §4 is explicit that
+ * Accumulates per stage. Metadata only — never content. The rule is that
  * cost logs must never contain student material, so this records counts and money,
  * and nothing that could carry a fragment of the source.
  */

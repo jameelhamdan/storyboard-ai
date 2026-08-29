@@ -9,7 +9,7 @@ import type { StageName } from './StageName.js';
  * Per-job ambient concerns: cancellation, a logger bound to the job id, the cost
  * meter, the workspace, and resolved config.
  *
- * Created per job and never shared. That is how brief §4's "no shared mutable
+ * Created per job and never shared. That is how the "no shared mutable
  * state between jobs" is satisfied structurally rather than by discipline — two
  * concurrent jobs cannot reach each other's state because neither holds a
  * reference that could.

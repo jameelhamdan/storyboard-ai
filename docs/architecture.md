@@ -154,7 +154,7 @@ Two layers, with a hard line between them:
   retry budgets, theme tokens. Versioned, reviewable, no secrets.
 - **`.env`** — secrets and deployment endpoints only.
 
-Two exceptions live in `.env` because the brief names and verifies them: `QUEUE_MAX_DEPTH` and
+Two exceptions live in `.env` because they are deployment knobs rather than behaviour: `QUEUE_MAX_DEPTH` and
 `WORKER_CONCURRENCY`. Both read `.env` first with the YAML value as fallback.
 
 Per-video styles are in `config/styles.yaml` — two sentences each, one steering the script and one
