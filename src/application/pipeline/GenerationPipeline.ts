@@ -1,6 +1,8 @@
 import type { PipelineStage } from './PipelineStage.js';
 import type { PipelineContext } from './PipelineContext.js';
-import { STAGE_ORDER, STAGE_WEIGHTS, TOTAL_WEIGHT, CHECKPOINT_KEY, type StageName } from './StageName.js';
+import {
+  STAGE_ORDER, STAGE_WEIGHTS, TOTAL_WEIGHT, CHECKPOINT_KEY, OPTIONAL_STAGES, type StageName,
+} from './StageName.js';
 import { carryToJson, carryFromJson, type CarryJson } from './codec.js';
 import { GenerationFailedError } from '@domain/error/GenerationFailedError.js';
 import { DomainError } from '@domain/error/DomainError.js';
@@ -34,7 +36,7 @@ export class GenerationPipeline {
     const byName = new Map<StageName, AnyStage>();
     for (const stage of stages) byName.set(stage.name, stage);
 
-    const missing = STAGE_ORDER.filter((name) => !byName.has(name));
+    const missing = STAGE_ORDER.filter((name) => !byName.has(name) && !OPTIONAL_STAGES.has(name));
     if (missing.length > 0) {
       throw new Error(`GenerationPipeline is missing stages: ${missing.join(', ')}.`);
     }
@@ -63,9 +65,25 @@ export class GenerationPipeline {
         continue;
       }
 
+      /**
+       * An optional stage this deployment did not wire.
+       *
+       * Its weight is still credited, because the weights are the progress scale
+       * and the API contract says the percentage reaches 100. Dropping the
+       * weight along with the stage would make every credential-free run finish
+       * at 97%.
+       */
+      const stage = this.stages.get(name);
+      if (!stage) {
+        completedWeight += weight;
+        ctx.logger.debug({ stage: name }, 'stage not configured for this deployment — skipped');
+        await this.onStageComplete(name, Progress.fromWeights(completedWeight, TOTAL_WEIGHT), ctx);
+        continue;
+      }
+
       const startedAt = Date.now();
       try {
-        carried = await this.stages.get(name)!.execute(carried, ctx);
+        carried = await stage.execute(carried, ctx);
       } catch (error) {
         throw this.wrap(error, name);
       }

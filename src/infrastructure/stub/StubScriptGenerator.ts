@@ -56,10 +56,21 @@ export class StubScriptGenerator implements ScriptGeneratorPort {
           narration,
           sourcedNarration: narration,
           citationIds: [citationId],
-          // Cycles the vocabulary so a stub run renders several different
-          // diagrams rather than nine copies of one — which is what makes the
-          // free stub run useful for eyeballing the visual language.
-          visualIntent: DIAGRAM_SHAPES[scenes.length % DIAGRAM_SHAPES.length]!,
+          /**
+           * Cycles the vocabulary so a stub run renders several different
+           * diagrams rather than nine copies of one — which is what makes the
+           * free stub run useful for eyeballing the visual language.
+           *
+           * Held for two consecutive scenes at a time, so half the boards in a
+           * stub run are *built* rather than standalone. The board machinery —
+           * shared markup, per-step anchors, step focus, one page load across a
+           * scene boundary — is the largest thing in the renderer, and a stub
+           * that never produced a multi-step board would leave all of it
+           * unexercised on the one path that runs with no credentials.
+           */
+          visualIntent: DIAGRAM_SHAPES[Math.floor(scenes.length / 2) % DIAGRAM_SHAPES.length]!,
+          // Odd scenes continue the board the even scene before them opened.
+          continuesBoard: scenes.length % 2 === 1,
         });
       }
     }

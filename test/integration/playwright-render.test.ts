@@ -14,6 +14,7 @@ import { BrowserPool } from '@infrastructure/render/BrowserPool.js';
 import { createLogger } from '@infrastructure/observability/logger.js';
 import { Storyboard } from '@domain/script/Storyboard.js';
 import { Scene } from '@domain/script/Scene.js';
+import { Board } from '@domain/script/Board.js';
 import { SceneTimeline } from '@domain/script/SceneTimeline.js';
 import { Duration } from '@domain/shared/Duration.js';
 import { WordTiming } from '@domain/media/WordTiming.js';
@@ -195,9 +196,12 @@ describe.skipIf(!available)('PlaywrightSceneRenderer (needs Chromium)', () => {
         theme, pool, logger, preset.width, preset.height,
       );
       const out = join(workDir, 'preview.png');
-      const written = await previewer.capture({ scene: sceneWithDiagram(), outputPath: out });
+      const { paths } = await previewer.capture({
+        board: Board.forScene(sceneWithDiagram()), outputPathFor: () => out,
+      });
 
-      expect(written).toBe(out);
+      // A standalone scene is a board of one step, so it yields one image.
+      expect(paths).toEqual([out]);
       const bytes = await readFile(out);
       expect(bytes.length).toBeGreaterThan(5_000);
       expect(bytes.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
@@ -341,7 +345,9 @@ describe.skipIf(!available)('PlaywrightSceneRenderer (needs Chromium)', () => {
         citations: [Citation.of('c', [SourceRef.page('d', 1)])],
         estimatedDuration: Duration.fromMs(1000),
       });
-      expect(await previewer.capture({ scene: bare, outputPath: '/tmp/never.png' })).toBeUndefined();
+      expect((await previewer.capture({
+        board: Board.forScene(bare), outputPathFor: () => '/tmp/never.png',
+      })).paths).toEqual([]);
     } finally {
       await pool.close();
     }
@@ -365,8 +371,12 @@ describe.skipIf(!available)('PlaywrightSceneRenderer (needs Chromium)', () => {
       });
 
       const [plain, themed] = [join(workDir, 'p.png'), join(workDir, 't.png')];
-      await previewer.capture({ scene: sceneWithDiagram(), outputPath: plain });
-      await previewer.capture({ scene: sceneWithDiagram(), outputPath: themed, visualPlan: plan });
+      await previewer.capture({
+        board: Board.forScene(sceneWithDiagram()), outputPathFor: () => plain,
+      });
+      await previewer.capture({
+        board: Board.forScene(sceneWithDiagram()), outputPathFor: () => themed, visualPlan: plan,
+      });
 
       // Different palettes must produce different pixels, or the plan is inert.
       const [a, b] = [await readFile(plain), await readFile(themed)];

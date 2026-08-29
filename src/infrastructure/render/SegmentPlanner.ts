@@ -4,12 +4,17 @@ import type { Storyboard } from '@domain/script/Storyboard.js';
 /**
  * Splits a job's frame range so each segment renders and retries independently.
  *
- * Segments align to scene boundaries wherever possible: a segment that straddles
- * a scene has to load two scenes' HTML, and a retry then redraws both. Scene-
- * aligned segments also make a failed segment diagnosable — it names the scene.
+ * Segments align to **board** boundaries, not scene boundaries.
+ *
+ * A board is one document loaded once and seeked across its whole span, so a
+ * segment that split a board mid-build would load the same page twice and — more
+ * to the point — would cut in the middle of a diagram that is still being drawn.
+ * Board-aligned segments cut only where the video already cuts, which is also
+ * the only place a cross-fade happens. A failed segment still names the scenes
+ * it covers, because a board carries them.
  */
 export function planSegments(storyboard: Storyboard, maxSegments: number): readonly RenderSegment[] {
-  const windows = storyboard.windows;
+  const windows = storyboard.boardWindows;
   if (windows.length === 0) return [];
 
   const total = storyboard.totalFrames;

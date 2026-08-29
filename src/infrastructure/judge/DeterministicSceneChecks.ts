@@ -63,12 +63,25 @@ export class DeterministicSceneChecks implements DeterministicSceneChecksPort {
    * One is tolerated because the documented fallback (inherit the previous
    * element's time) degrades gracefully; two or more means the model is not
    * anchoring against the narration it was given, and the sync will visibly drift.
+   *
+   * **Only this scene's own step is checked.** A board is one document shared by
+   * every scene narrated over it, so `scene.html` contains the phrases for every
+   * step — and the phrases for step 2 are verbatim from scene 2's narration and
+   * appear nowhere in scene 1's. Scraping the whole markup therefore failed
+   * every scene of every built board on anchors that were perfectly correct, and
+   * the judge then spent its whole retry budget on boards that were never wrong.
+   *
+   * `timeline.anchors` is the right set and not a weaker one: it is produced by
+   * `anchorsIn` reading this same markup, then filtered to the scene's step by
+   * the storyboard stage — which is exactly the subset this scene will be asked
+   * to resolve at synthesis, and so exactly the subset whose failure to match
+   * would mistime it.
    */
   private checkAnchors(scene: Scene): string[] {
     if (!scene.html) return [];
 
-    const anchors = [...scene.html.matchAll(/data-on\s*=\s*"([^"]*)"/g)]
-      .map((m) => m[1] ?? '')
+    const anchors = scene.timeline.anchors
+      .map((anchor) => anchor.phrase ?? '')
       .filter(Boolean);
 
     const haystack = scene.spokenText.toLowerCase().replace(/\s+/g, ' ');

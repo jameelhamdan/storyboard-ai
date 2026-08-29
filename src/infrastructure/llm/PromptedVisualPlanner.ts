@@ -77,6 +77,13 @@ export class PromptedVisualPlanner implements VisualPlannerPort {
       user: prompt.user,
       tier: 'quality',
       responseSchema: planSchema as unknown as Record<string, unknown>,
+      /**
+       * A palette plus one short concept per scene, so the ceiling scales with
+       * the script rather than being a flat guess. Truncation here is not fatal
+       * — the stage falls back to the theme palette — but it is a wasted call,
+       * so the allowance per scene is generous.
+       */
+      maxOutputTokens: 400 + 150 * input.script.scenes.length,
       ...(input.signal ? { signal: input.signal } : {}),
     });
 

@@ -77,11 +77,16 @@ export function renderDiagram(diagram: SceneDiagram, sceneIndex: number): Render
 function anchorsIn(html: string): TimelineAnchor[] {
   return [...html.matchAll(/<[a-z][a-z0-9-]*\b[^>]*\bid="([^"]+)"[^>]*>/gi)].map((match) => {
     const phrase = /\bdata-on="([^"]*)"/i.exec(match[0])?.[1];
+    // Read back off the markup for the same reason the phrase is: the step the
+    // element actually carries is the one the browser will act on, and a step
+    // assembled separately could disagree with it.
+    const step = Number(/\bdata-step="(\d+)"/i.exec(match[0])?.[1] ?? '1');
     return {
       elementId: match[1]!,
       phrase: phrase || undefined,
       draw: 'normal' as const,
       hold: true,
+      step: Number.isFinite(step) && step >= 1 ? step : 1,
     };
   });
 }
@@ -102,7 +107,7 @@ const PLATES: Record<DiagramShape, Plate> = {
   flow: (d, id) =>
     row(
       d.nodes.map((n, i) => box(n, id.node(i))),
-      (i) => arrowRight(attr(id.edge(i - 1), d.edges[i - 1]?.anchor)),
+      (i) => arrowRight(attr(id.edge(i - 1), d.edges[i - 1]?.anchor, d.edges[i - 1]?.step)),
     ),
 
   /**
@@ -114,10 +119,10 @@ const PLATES: Record<DiagramShape, Plate> = {
     [
       row(
         d.nodes.map((n, i) => box(n, id.node(i))),
-        (i) => arrowRight(attr(id.edge(i - 1), d.edges[i - 1]?.anchor)),
+        (i) => arrowRight(attr(id.edge(i - 1), d.edges[i - 1]?.anchor, d.edges[i - 1]?.step)),
       ),
       // The closing edge, when the model named one, rides the return arc.
-      `    ${returnArc(attr(id.decoration, d.edges[d.nodes.length - 1]?.anchor))}`,
+      `    ${returnArc(attr(id.decoration, d.edges[d.nodes.length - 1]?.anchor, d.edges[d.nodes.length - 1]?.step))}`,
     ].join('\n'),
 
   /** Two columns, one accent each. Exactly two, by SHAPE_LIMITS. */
@@ -242,7 +247,7 @@ const PLATES: Record<DiagramShape, Plate> = {
       rest
         .map(
           (n, i) =>
-            `        <div class="sc-part-row">${leader(attr(id.edge(i)))}` +
+            `        <div class="sc-part-row">${leader(attr(id.edge(i), d.edges[i]?.anchor, d.edges[i]?.step))}` +
             `<span class="sc-part" id="${id.node(i + 1)}"${data(n)}>${escapeHtml(n.label)}</span></div>`,
         )
         .join('\n'),
@@ -365,9 +370,36 @@ function detail(node: DiagramNode, cls: string): string {
   return node.detail ? `<span class="${cls}">${escapeHtml(node.detail)}</span>` : '';
 }
 
-/** The anchor phrase, carried onto the element so the markup states its own timing. */
-function data(node: { anchor?: string }): string {
-  return node.anchor ? ` data-on="${escapeHtml(node.anchor)}"` : '';
+/**
+ * The anchor phrase and the build step, carried onto the element.
+ *
+ * Both belong on the markup rather than in a list beside it, for the same
+ * reason: `anchorsIn` reads the timing back *off* the element, and the seek
+ * script reads the step off it in the browser. A step that never reaches the
+ * element makes it part of step 1, so it stays at full weight for the whole
+ * board instead of receding — which looks like the focus feature simply not
+ * working rather than like a missing attribute.
+ *
+ * Step 1 is left off deliberately: it is the default on both readers, and a
+ * single-step board would otherwise carry a `data-step="1"` on every element
+ * for no purpose.
+ */
+function data(node: { anchor?: string; step?: number }): string {
+  return (
+    (node.anchor ? ` data-on="${escapeHtml(node.anchor)}"` : '') +
+    step(node.step)
+  );
+}
+
+/**
+ * `data-step`, stamped whenever the diagram gave the element one.
+ *
+ * `SceneDiagram` materialises the default on a built board and leaves it off a
+ * single-step one, so this emits exactly when the seek script needs to find the
+ * element — including for step 1, which is the first thing to recede.
+ */
+function step(value: number | undefined): string {
+  return value !== undefined ? ` data-step="${Math.trunc(value)}"` : '';
 }
 
 /**
@@ -377,8 +409,12 @@ function data(node: { anchor?: string }): string {
  * — `anchorsIn` reads the phrase back off the element, so a connector without
  * `data-on` draws at scene start no matter what the model asked for.
  */
-function attr(elementId: string, anchor?: string): string {
-  return `id="${elementId}"${anchor ? ` data-on="${escapeHtml(anchor)}"` : ''}`;
+function attr(elementId: string, anchor?: string, atStep?: number): string {
+  return (
+    `id="${elementId}"` +
+    (anchor ? ` data-on="${escapeHtml(anchor)}"` : '') +
+    step(atStep)
+  );
 }
 
 /** Rounded to 5% so one small set of classes covers every bar. */

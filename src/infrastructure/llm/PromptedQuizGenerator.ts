@@ -42,6 +42,12 @@ export class PromptedQuizGenerator implements QuizGeneratorPort {
       user: prompt.user,
       tier: 'volume',
       responseSchema: quizSchema as unknown as Record<string, unknown>,
+      /**
+       * Three to seven questions, each a question, an answer and a timestamp.
+       * 1200 is roughly double the largest quiz the policy permits, which leaves
+       * room for a verbose model without leaving room for a runaway one.
+       */
+      maxOutputTokens: 1200,
       ...(input.signal ? { signal: input.signal } : {}),
     });
 

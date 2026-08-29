@@ -116,8 +116,11 @@ describe('renderDiagram', () => {
     });
     const { anchors } = renderDiagram(d, 2);
 
-    // The title always leads, with no phrase, so it lands at scene start.
-    expect(anchors[0]).toEqual({ elementId: 's2-title', phrase: undefined, draw: 'normal', hold: true });
+    // The title always leads, with no phrase, so it lands at scene start, and
+    // it belongs to step 1 — a board's heading is there from the first frame.
+    expect(anchors[0]).toEqual({
+      elementId: 's2-title', phrase: undefined, draw: 'normal', hold: true, step: 1,
+    });
     // Document order — the arrow sits between the two boxes it joins. Order here
     // does not decide what draws first; SceneTimeline resolves by time, so an
     // impossible sequence cannot be authored.
@@ -126,6 +129,39 @@ describe('renderDiagram', () => {
     for (const anchor of anchors) {
       expect(renderDiagram(d, 2).html).toContain(`id="${anchor.elementId}"`);
     }
+  });
+
+  /**
+   * The join between a built board and the per-scene timelines.
+   *
+   * Each scene resolves only its own step's anchors, against its own measured
+   * timings, so the step has to survive the round trip out to markup and back.
+   * If it did not, every scene would try to resolve every phrase, fail on most
+   * of them, and inherit timings — a board that draws itself all at once.
+   */
+  it('carries each element\'s step out to the markup and back', () => {
+    const d = SceneDiagram.of({
+      shape: 'flow', title: 'T', steps: 2,
+      nodes: [
+        { id: 'a', label: 'A', anchor: 'the first', step: 1 },
+        { id: 'b', label: 'B', anchor: 'the second', step: 2 },
+      ],
+      edges: [{ from: 'a', to: 'b', anchor: 'becomes', step: 2 }],
+    });
+    const { html, anchors } = renderDiagram(d, 0);
+
+    expect(html).toContain('data-step="2"');
+    // Stamped on step 1 as well: the seek script finds what to dim with
+    // `[data-step]`, and step 1 is the first set that has to recede.
+    expect(html).toContain('data-step="1"');
+
+    const byStep = (step: number) =>
+      anchors.filter((a) => (a.step ?? 1) === step).map((a) => a.phrase);
+
+    // Document order within each step, as above: the arrow sits between the two
+    // boxes it joins, so it precedes the node it points at.
+    expect(byStep(1)).toEqual([undefined, 'the first']);
+    expect(byStep(2)).toEqual(['becomes', 'the second']);
   });
 
   it('escapes text that would otherwise close a tag', () => {

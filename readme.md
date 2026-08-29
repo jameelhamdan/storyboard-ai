@@ -67,9 +67,10 @@ video output. The stages that need a model provider are stubbed behind their por
 | Quality judge, quiz, vision OCR | ✅ real (OpenAI or Gemini) — stub by default |
 | Transcription | ✅ real (local whisper.cpp) — stub by default |
 | Whiteboard aesthetic | ✅ real — every scene is a diagram (one of thirteen shapes), HTML/CSS for text and SVG for strokes, enforced by a pre-render gate |
+| Diagrams that build across scenes | ✅ real — consecutive scenes share one board: it is drawn once and grown a step at a time, with earlier steps receding as the focus moves. One storyboard call and one judge call per board rather than per scene |
 | Story plan review before illustration | ✅ real — the scene set, order and per-scene shape are judged and revised before a board exists |
 | Found images on a board | ✅ real — Wikimedia Commons, Unsplash, Pexels; inlined, credited, selectable per request |
-| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default. Works with **no credential** via `WEB_SEARCH_DRIVER=duckduckgo` |
+| Web research grounding | ✅ real — searched pages enter as ordinary sources and are cited like an upload; off by default. **Keyless only** unless you bring a Brave key: `WEB_SEARCH_DRIVER=duckduckgo` costs nothing |
 | Found diagrams draw themselves | ✅ real — contours traced once into SVG strokes, revealed like every other drawn line, deterministic per frame |
 | Visual plan + vision judge | ✅ real — palette chosen per video, scenes judged from screenshots |
 

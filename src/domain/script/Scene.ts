@@ -25,6 +25,19 @@ export class Scene {
     public readonly sourcedText: string,
     public readonly citations: readonly Citation[],
     public readonly visualIntent: DiagramShape,
+    /**
+     * True when this scene keeps the previous scene's board and adds to it.
+     *
+     * This is the difference between a slideshow and an explanation. A video
+     * whose every scene wipes to a fresh board makes the viewer rebuild the
+     * context each time; the reference explainers instead draw one diagram and
+     * grow it, so the thing being explained stays on screen while the narration
+     * walks around it. A continuing scene is a *step* of the board it joins —
+     * see `Board` and `SceneDiagram.steps`.
+     *
+     * Always false on the first scene, which has nothing to continue.
+     */
+    public readonly continuesBoard: boolean,
     public readonly html: string | undefined,
     public readonly timeline: SceneTimeline,
     public readonly estimatedDuration: Duration,
@@ -42,13 +55,15 @@ export class Scene {
     citations: readonly Citation[];
     visualIntent: DiagramShape;
     estimatedDuration: Duration;
+    /** Defaults to false: a scene starts its own board unless it says otherwise. */
+    continuesBoard?: boolean;
   }): Scene {
     const spoken = input.spokenText.trim();
     if (!spoken) throw new RangeError(`Scene ${input.index} has no narration.`);
     const written = (input.writtenText ?? spoken).trim();
     return new Scene(
       input.index, spoken, written, (input.sourcedText ?? written).trim(), input.citations,
-      input.visualIntent, undefined, SceneTimeline.unresolved([]),
+      input.visualIntent, input.continuesBoard ?? false, undefined, SceneTimeline.unresolved([]),
       input.estimatedDuration, undefined, [], false,
     );
   }
@@ -65,7 +80,8 @@ export class Scene {
   public withStoryboard(html: string, timeline: SceneTimeline, usedFallback = false): Scene {
     return new Scene(
       this.index, this.spokenText, this.writtenText, this.sourcedText, this.citations, this.visualIntent,
-      html, timeline, this.estimatedDuration, this.measuredDuration, this.wordTimings, usedFallback,
+      this.continuesBoard, html, timeline, this.estimatedDuration, this.measuredDuration,
+      this.wordTimings, usedFallback,
     );
   }
 
@@ -73,11 +89,31 @@ export class Scene {
   public withMeasuredAudio(measured: Duration, timings: readonly WordTiming[]): Scene {
     return new Scene(
       this.index, this.spokenText, this.writtenText, this.sourcedText, this.citations, this.visualIntent,
-      this.html, this.timeline.resolve(timings), this.estimatedDuration, measured, timings, this.usedFallbackComponent,
+      this.continuesBoard, this.html, this.timeline.resolve(timings), this.estimatedDuration, measured,
+      timings, this.usedFallbackComponent,
     );
   }
 
   public asFallbackComponent(html: string, timeline: SceneTimeline): Scene {
-    return this.withStoryboard(html, timeline, true);
+    /**
+     * A fallback board is this scene's own, so it can no longer be a step of
+     * whatever board it was joining: the elements it was meant to add do not
+     * exist. Breaking the continuation here keeps `groupIntoBoards` honest —
+     * otherwise the board would claim a step whose markup is a different
+     * diagram entirely.
+     */
+    return new Scene(
+      this.index, this.spokenText, this.writtenText, this.sourcedText, this.citations, this.visualIntent,
+      false, html, timeline, this.estimatedDuration, this.measuredDuration, this.wordTimings, true,
+    );
+  }
+
+  /** The same scene, told whether it opens a board or continues one. */
+  public withBoardContinuation(continuesBoard: boolean): Scene {
+    return new Scene(
+      this.index, this.spokenText, this.writtenText, this.sourcedText, this.citations, this.visualIntent,
+      continuesBoard, this.html, this.timeline, this.estimatedDuration, this.measuredDuration,
+      this.wordTimings, this.usedFallbackComponent,
+    );
   }
 }

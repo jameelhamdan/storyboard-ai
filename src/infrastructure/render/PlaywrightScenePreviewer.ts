@@ -1,11 +1,11 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { ScenePreviewPort, ScenePreview } from '@application/port/ScenePreviewPort.js';
-import type { Scene } from '@domain/script/Scene.js';
+import type { BoardPreviewPort, BoardPreview } from '@application/port/ScenePreviewPort.js';
+import type { Board } from '@domain/script/Board.js';
 import type { Theme } from '@domain/media/Theme.js';
 import type { VisualPlan } from '@domain/media/VisualPlan.js';
 import type { LoggerPort } from '@application/port/LoggerPort.js';
-import { buildSceneDocument } from './page/document.js';
+import { buildBoardDocument } from './page/document.js';
 import { measureScript } from './page/measure.js';
 import type { BrowserPool } from './BrowserPool.js';
 
@@ -21,7 +21,7 @@ import type { BrowserPool } from './BrowserPool.js';
  * alone, which is worse but not fatal; failing here would turn a screenshot
  * problem into a rejected scene.
  */
-export class PlaywrightScenePreviewer implements ScenePreviewPort {
+export class PlaywrightScenePreviewer implements BoardPreviewPort {
   /** Comfortably past any scene's last reveal. */
   private static readonly SETTLED_MS = 600_000;
 
@@ -34,55 +34,84 @@ export class PlaywrightScenePreviewer implements ScenePreviewPort {
   ) {}
 
   public async capture(input: {
-    scene: Scene;
-    outputPath: string;
+    board: Board;
+    outputPathFor: (step: number) => string;
     visualPlan?: VisualPlan;
     width?: number;
     height?: number;
     minFontRem?: number;
     signal?: AbortSignal;
-  }): Promise<ScenePreview> {
+  }): Promise<BoardPreview> {
     const width = input.width ?? this.width;
     const height = input.height ?? this.height;
-    const nothing: ScenePreview = { path: undefined, layoutFailures: [] };
+    const nothing: BoardPreview = { paths: [], layoutFailures: [] };
+    const { board } = input;
 
-    if (!input.scene.html) return nothing;
+    if (!board.html) return nothing;
     if (input.signal?.aborted) return nothing;
 
     try {
-      await mkdir(dirname(input.outputPath), { recursive: true });
       const page = await this.browsers.page({ width, height });
       try {
-        const html = buildSceneDocument({
-          scene: input.scene,
+        const html = buildBoardDocument({
+          board,
           theme: this.theme,
           width,
           height,
           ...(input.visualPlan ? { visualPlan: input.visualPlan } : {}),
         });
         await page.setContent(html, { waitUntil: 'domcontentloaded' });
-        await page.evaluate(`window.__seekTo(${PlaywrightScenePreviewer.SETTLED_MS})`);
 
-        // Measured from the same settled page that is about to be photographed,
-        // so the numbers describe the image rather than some other state of it.
+        /**
+         * Measured once, at the settled end of the build.
+         *
+         * Every element is visible there, so this is the strictest state the
+         * board ever reaches — and it is the *only* one worth measuring, since a
+         * step toggles visibility without touching layout. A collision that does
+         * not exist here cannot appear at an earlier step.
+         */
+        await page.evaluate(`window.__seekTo(${PlaywrightScenePreviewer.SETTLED_MS})`);
         const minFontPx = (input.minFontRem ?? this.theme.tokens.type.minRem) * 16;
         const layoutFailures = (await page.evaluate(
           measureScript(width, height, minFontPx),
         )) as string[];
 
-        await page.screenshot({
-          path: input.outputPath,
-          type: 'png',
-          clip: { x: 0, y: 0, width, height },
-        });
-        return { path: input.outputPath, layoutFailures };
+        /**
+         * One frame per step, each at the moment that step finishes.
+         *
+         * Seeked one millisecond before the next step begins, so the frame shows
+         * that step complete and still in focus rather than already receding.
+         * The last step has no successor and is photographed settled.
+         */
+        const paths: string[] = [];
+        for (let step = 1; step <= board.steps; step += 1) {
+          if (input.signal?.aborted) break;
+
+          const next = board.scenes[step];
+          const at = next
+            ? Math.max(0, board.offsetOf(next.index).ms - 1)
+            : PlaywrightScenePreviewer.SETTLED_MS;
+
+          await page.evaluate(`window.__seekTo(${at})`);
+
+          const outputPath = input.outputPathFor(step);
+          await mkdir(dirname(outputPath), { recursive: true });
+          await page.screenshot({
+            path: outputPath,
+            type: 'png',
+            clip: { x: 0, y: 0, width, height },
+          });
+          paths.push(outputPath);
+        }
+
+        return { paths, layoutFailures };
       } finally {
         await page.context().close().catch(() => undefined);
       }
     } catch (error) {
       this.logger.warn(
-        { sceneIndex: input.scene.index, err: error },
-        'scene preview failed; judging from markup alone',
+        { sceneIndexes: board.sceneIndexes, err: error },
+        'board preview failed; judging from markup alone',
       );
       return nothing;
     }

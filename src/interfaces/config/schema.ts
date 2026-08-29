@@ -293,7 +293,7 @@ export const envSchema = z.object({
    * GEMINI_API_KEY — but it can only answer *research*: grounding returns pages,
    * never images. `brave` answers both and wants its own key.
    */
-  WEB_SEARCH_DRIVER: z.enum(['none', 'duckduckgo', 'gemini', 'brave']).default('none'),
+  WEB_SEARCH_DRIVER: z.enum(['none', 'duckduckgo', 'brave']).default('none'),
   BRAVE_API_KEY: z.string().optional(),
   WEB_SEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   /** Wikimedia's API policy requires a real contact address in the User-Agent. */

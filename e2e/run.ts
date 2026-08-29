@@ -21,7 +21,6 @@ import { loadConfig } from '../src/interfaces/config/loadConfig.js';
 import { buildContainer } from '../src/interfaces/composition/container.js';
 import { createLogger } from '../src/infrastructure/observability/logger.js';
 import { GenerationPipeline } from '../src/application/pipeline/GenerationPipeline.js';
-import { CostMeter, DEFAULT_PRICING } from '../src/infrastructure/observability/CostMeter.js';
 import { FfmpegRunner } from '../src/infrastructure/encode/FfmpegRunner.js';
 import type { PipelineContext } from '../src/application/pipeline/PipelineContext.js';
 import type { FinalisedJob, SubmittedSource } from '../src/application/pipeline/stage/types.js';
@@ -291,15 +290,12 @@ const job = VideoJob.create({
 });
 job.start(new Date());
 
-const costMeter = new CostMeter(DEFAULT_PRICING, {
-  llm: config.env.LLM_DRIVER,
-  tts: config.env.TTS_DRIVER,
-  stt: config.env.STT_DRIVER,
-  rendering: 'playwright',
-  storage: 'local',
-  embeddings: 'stub',
-  search: 'none',
-});
+/**
+ * Priced by the container, from the drivers this run actually selected — not
+ * from `DEFAULT_PRICING`, which knows nothing about them. A stub run reported
+ * ElevenLabs' per-character rate for silence it generated locally.
+ */
+const costMeter = container.newCostMeter();
 const started = Date.now();
 
 const stageSeconds = new Map<string, number>();

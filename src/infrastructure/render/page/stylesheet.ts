@@ -138,6 +138,37 @@ html[data-vignette="subtle"] body::after {
   transform-origin: left center;
 }
 
+/* ── Step focus ─────────────────────────────────────────────────────────────
+   What makes a board *build* rather than just appear.
+
+   A board is one diagram narrated over several scenes. Everything drawn in an
+   earlier step stays on screen — that is the point, the viewer keeps the
+   context — but it must stop competing for attention with the part being
+   explained now. So an element recedes once its step is past: it desaturates
+   towards the board and gives up some contrast, while keeping its position and
+   its shape.
+
+   Deliberately expressed as a filter rather than by overriding opacity or
+   color. Every reveal rule above already owns one or both of those, and there
+   are eight of them across HTML and SVG; a second declaration would have to
+   fight each in turn, and the SVG stroke rules could not be expressed that way
+   at all. filter composes with all of them, multiplying whatever the reveal
+   left behind, so this rule is additive and none of the above changes.
+
+   Applied only to elements the seek script has actually dimmed. An identity
+   filter on every element would still force a compositing layer per element,
+   and a board is drawn thousands of times. */
+[data-dimmed] {
+  filter:
+    opacity(calc(1 - var(--step-dim-fade, 0.45) * var(--dim, 0)))
+    saturate(calc(1 - var(--step-dim-desaturate, 0.8) * var(--dim, 0)));
+}
+
+/* An element whose step has not arrived. visibility, not display: the board is
+   laid out once for the whole build and nothing may reflow as steps arrive, so
+   a pending element still occupies its box. */
+[data-step-pending] { visibility: hidden; }
+
 /* ── SVG stroke drawing ─────────────────────────────────────────────────────
    The real hand-drawn primitive: a stroke advancing along its own geometry
    rather than a rectangle being stretched. pathLength="1" normalises every

@@ -105,7 +105,7 @@ and the model-facing ones also have a stub.
 | `QualityJudgePort` | `PromptedQualityJudge` | `StubQualityJudge` |
 | `StoryPlanJudgePort` | `PromptedStoryPlanJudge` | `StubStoryPlanJudge` |
 | `ImageSourcePort` | `WikimediaImageSource`, `UnsplashImageSource`, `PexelsImageSource`, and for the open web either `OpenverseImageSource` (keyless, licensed) or `WebSearchImageSource` (Brave) — resolved by id through `ImageSourceRegistry` | — |
-| `WebSearchPort` | `DuckDuckGoSearch` (**no credential at all**), `GeminiGroundedSearch` (no *extra* credential), `BraveWebSearch` | — |
+| `WebSearchPort` | `DuckDuckGoSearch` (**no credential at all**), `BraveWebSearch` | — |
 | `IllustrationFinderPort` | `CompositeImageSource` — asks the permitted sources in the order `ImageSourcePolicy` gives — wrapped by `TracingIllustrationFinder`, which draws a found diagram as strokes | — (absent when no key is configured) |
 | `SpeechSynthesisPort` | `OpenAiSpeechSynthesizer`, `ElevenLabsSpeechSynthesizer`, `GeminiSpeechSynthesizer` | `StubSpeechSynthesizer` |
 | `TranscriptionPort` | `WhisperCliTranscriber` | `StubTranscriber` |

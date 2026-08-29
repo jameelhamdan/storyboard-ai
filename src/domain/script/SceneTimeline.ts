@@ -13,6 +13,20 @@ export interface TimelineAnchor {
   readonly phrase: string | undefined;
   readonly draw: DrawSpeed;
   readonly hold: boolean;
+  /**
+   * Which step of the board's build this element belongs to, 1-based.
+   *
+   * A board spans several scenes, and each scene owns only its own step's
+   * anchors — their phrases appear in that scene's narration and are resolved
+   * against that scene's measured timings. Splitting on this is what lets one
+   * shared board carry several scenes' timings without any of them resolving a
+   * phrase from a scene it never narrated.
+   *
+   * Optional, and absent means 1. A board of one scene has exactly one step, so
+   * every caller that predates boards is describing step 1 whether it says so
+   * or not.
+   */
+  readonly step?: number;
 }
 
 export interface ResolvedReveal {

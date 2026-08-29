@@ -78,18 +78,46 @@ its audio. So a job resumed after a render interruption re-pays for nothing at a
 | 5 | `consolidate` | 5 | Merges exact and near-duplicate chunks, resolves conflicts by `SourcePrecedencePolicy`. Slides plus a recording of those slides would otherwise be narrated twice. Throws `INSUFFICIENT_CONTENT` below the thresholds |
 | 6 | `script` | 8 | Quality-tier model writes the narration, then settles the visual plan. `PersonalisationPolicy` folds `student_context`, the chosen `style` and the caller's `direction` into one brief; `DurationPolicy` sets the target length and word budget; `ScriptScopingPolicy` rejects any sentence without a resolvable citation. It also picks each scene's **diagram shape** from a thirteen-value vocabulary — the one decision only this stage can make well, since it has the whole source in front of it. Normalisation runs last, so everything downstream sees one identical spoken form. A failed visual plan is never fatal — it falls back to the theme palette |
 | 7 | `planReview` | 3 | Quality-tier model grades the **whole story before anything is drawn**: coverage of the material, ordering, one idea per scene, whether each scene's chosen shape fits what it says. On an objection the script is rewritten with the critique attached, up to `judge.maxPlanRevisions`. The better plan ships and the video always ships — a plan that never satisfies the judge goes on with its objections logged. Skipped when the request sets `features.plan_review: false` |
-| 8 | `storyboard` | 9 | Volume-tier model *describes* the shape the script chose — nodes, edges, labels and `anchor` phrases, with no coordinates and no CSS — and `render/diagram/` lays it out. A board that overlaps or clips is not something the format can express. Fans out under `concurrency.storyboard` |
-| 9 | `judgeStoryboard` | 8 | Stage A (free markup **and geometry** checks — overlap, clipping and text size measured off the laid-out page) then Stage B (a **quality-tier vision** call on what survives). Per scene: pass, regenerate with the failed gates and the judge's notes, or stop and **ship the best attempt**. Fans out under `concurrency.judge` |
+| 8 | `storyboard` | 9 | Volume-tier model *describes* the shape the script chose — nodes, edges, labels, `anchor` phrases and the **step** each element arrives in, with no coordinates and no CSS — and `render/diagram/` lays it out. **One call per board, not per scene.** A board that overlaps or clips is not something the format can express. Fans out under `concurrency.storyboard` |
+| 9 | `judgeStoryboard` | 8 | Stage A (free markup **and geometry** checks — overlap, clipping and text size measured off the laid-out page) then Stage B (a **quality-tier vision** call on what survives, **one per board**, carrying one frame per step). Per board: pass, regenerate with the failed gates and the judge's notes, or stop and **ship the best attempt**. Fans out under `concurrency.judge` |
 | 10 | `synthesize` | 13 | TTS per scene under `concurrency.speechSynthesis`, then concatenation and loudness normalisation — and finally the **re-time**, which rebuilds the storyboard timeline from measured audio |
 | 11 | `subtitles` | 1 | Cues from absolute word timings via `SubtitleSegmentationPolicy`, written as SRT. Drift over tolerance is logged loudly — a slightly-off subtitle beats no subtitle |
 | 12 | `quiz` | 1 | 3–7 questions from the *timed* script, so `source_moment_seconds` is exact rather than estimated |
-| 13 | `render` | 28 | Chromium draws frames, ffmpeg encodes segments, fanned out under `concurrency.renderSegments`. Per-segment resume: an already-encoded segment is not redrawn |
+| 13 | `render` | 28 | Chromium draws frames, ffmpeg encodes segments, fanned out under `concurrency.renderSegments`. **One page load per board**, seeked across its whole span, so a board persists across its scenes instead of being redrawn at each. Segments are board-aligned. Per-segment resume: an already-encoded segment is not redrawn |
 | 14 | `assemble` | 5 | Concatenates segments, muxes the narration track, and muxes the subtitles as a `mov_text` track — soft, not burned in, and marked default |
 | 15 | `publish` | 4 | MP4, SRT, `traceability.json` and `cost.json` to object storage, presigned — then records the final cost and reclaims the workspace. With `workspace.keepRunArtifacts` on it first lays the run out per scene under `13-run/` and the workspace is **not** reclaimed |
 
 Weights sum to 100 and are the progress scale — `StageName.ts` throws at import time if they stop
 summing to 100, because the reported percentage would otherwise silently stop meaning what the API
 contract says it means. Render dominates because it does.
+
+### Boards: the unit almost everything downstream works in
+
+A **board** is one diagram and the consecutive scenes narrated over it. The script stage decides
+where boards break (`continuesBoard`); everything after it works in boards rather than scenes.
+
+The reason is what makes an explainer readable. A video whose every scene wipes to a fresh board
+makes the viewer rebuild the context each time. The reference explainers instead put a diagram up
+and walk around it — adding the second box, then the arrow, then what the arrow leads to — so the
+thing being explained stays on screen while each part is discussed. A board is laid out **once**,
+in full, and revealed a **step** at a time: step *N* arrives while the *N*th scene is spoken, takes
+the focus, and everything already drawn stays put and recedes.
+
+Three consequences worth stating, because each is load-bearing:
+
+- **The node budget does not grow with the build.** A shape's limit is a layout constraint — what
+  fits without crowding — so a four-node `flow` narrated over three scenes is still four nodes. The
+  steps decide *when* parts arrive, not how many there are. `groupIntoBoards` therefore also caps a
+  board's steps at its shape's node budget: `focus` holds one node and so exactly one scene.
+- **Geometry is measured once and holds for every step.** A step toggles `visibility`, never layout,
+  so nothing reflows as the board builds — which is why one Stage A measurement covers the whole
+  build rather than one per step.
+- **A step is a hard gate on visibility.** An anchor that fails to match inherits the previous
+  element's time, and across a board that could put a step-3 node on screen during step 1 — giving
+  the ending away. Gating on the step bounds a missed anchor to mistiming *within* its own step.
+
+A board of one scene behaves exactly as a scene did before boards existed, so a video whose scenes
+all stand alone is unchanged.
 
 ### Four ordering decisions worth knowing
 
@@ -106,8 +134,11 @@ the time a board exists those answers are settled: a beautifully drawn board of 
 every gate there is. `planReview` is also the cheapest stage that can send work backwards, which is
 why it sits immediately after the script rather than after the storyboard.
 
-**The judge runs before the render.** A bad scene costs one regeneration rather than a wasted
+**The judge runs before the render.** A bad board costs one regeneration rather than a wasted
 18,000-frame render.
+
+**A cross-fade means a new diagram.** It happens at board boundaries and nowhere else — fading
+inside a board would throw away exactly the continuity the board exists to provide.
 
 **Re-timing happens at the end of synthesis, before anything is drawn.** Planned scene durations
 never match synthesized audio, so the timeline is rebuilt from what was measured. That re-time

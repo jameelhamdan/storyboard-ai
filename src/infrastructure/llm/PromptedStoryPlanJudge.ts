@@ -52,7 +52,15 @@ export class PromptedStoryPlanJudge implements StoryPlanJudgePort {
       user: prompt.user,
       tier: 'quality',
       responseSchema: planJudgeSchema as unknown as Record<string, unknown>,
-      maxOutputTokens: 4096,
+      /**
+       * A critique, not a rewrite: a verdict per scene plus the objections that
+       * justify it. Measured at ~2,400 tokens a call on the quality tier in
+       * `out/20260828-152720-heart`, where this stage was 25% of the bill for a
+       * four-scene plan. 2048 still holds a full critique of a ten-scene plan
+       * and caps the case where the model starts drafting the replacement script
+       * instead of objecting to this one.
+       */
+      maxOutputTokens: 2048,
       ...(input.signal ? { signal: input.signal } : {}),
     });
 

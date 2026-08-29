@@ -5,15 +5,15 @@ import type {
   SceneRendererPort, RenderSegment, RenderedSegment,
 } from '@application/port/SceneRendererPort.js';
 import type { Storyboard } from '@domain/script/Storyboard.js';
-import type { Scene } from '@domain/script/Scene.js';
-import type { SceneWindow } from '@domain/script/Storyboard.js';
+import type { Board } from '@domain/script/Board.js';
+import type { BoardWindow } from '@domain/script/Storyboard.js';
 import type { Theme } from '@domain/media/Theme.js';
 import type { VisualPlan } from '@domain/media/VisualPlan.js';
 import type { LoggerPort } from '@application/port/LoggerPort.js';
 import { FfmpegRunner } from '../encode/FfmpegRunner.js';
 import { planSegments } from './SegmentPlanner.js';
 import { scheduleFrames, toConcatList, transitionProgress } from './FrameSchedule.js';
-import { buildSceneDocument } from './page/document.js';
+import { buildBoardDocument } from './page/document.js';
 import type { BrowserPool } from './BrowserPool.js';
 
 /**
@@ -55,7 +55,10 @@ export class PlaywrightSceneRenderer implements SceneRendererPort {
     const scheduleOptions = {
       revealMs: this.theme.tokens.motion.revealMs,
       fps: preset.fps,
-      transitionMs: SCENE_TRANSITION_MS,
+      transitionMs: BOARD_TRANSITION_MS,
+      // Must match what buildBoardDocument stamps as data-step-dim-ms, or the
+      // schedule holds a still through frames the page is still changing on.
+      stepDimMs: this.theme.tokens.motion.revealMs * 2,
     };
     const schedule = scheduleFrames(storyboard, segment, scheduleOptions);
 
@@ -68,26 +71,34 @@ export class PlaywrightSceneRenderer implements SceneRendererPort {
 
     const page = await this.browsers.page({ width: preset.width, height: preset.height });
     try {
-      let currentScene: number | undefined;
+      let currentBoard: number | undefined;
 
       for (const entry of schedule) {
         if (input.signal?.aborted) throw new Error('Cancelled during render.');
 
-        const window = windowFor(storyboard, entry.frame);
+        const window = boardWindowFor(storyboard, entry.frame);
         if (!window) continue;
-        const scene = storyboard.scenes[window.sceneIndex];
-        if (!scene) continue;
+        const board = storyboard.boards[window.boardIndex];
+        if (!board) continue;
 
-        // Reloading the document per frame would dominate the cost; it only
-        // changes when the segment crosses into a different scene.
-        if (currentScene !== window.sceneIndex) {
-          await this.loadScene(page, scene, preset.width, preset.height, input.visualPlan);
-          currentScene = window.sceneIndex;
+        /**
+         * One page load per *board*, not per scene.
+         *
+         * This is what makes a board persist. A board spans several scenes and
+         * is one document; reloading it at each scene boundary would reset every
+         * element to its unrevealed state and redraw the diagram from nothing,
+         * which is exactly the wipe the build exists to remove. Segments are
+         * board-aligned, so in practice this loads once per segment.
+         */
+        if (currentBoard !== window.boardIndex) {
+          await this.loadBoard(page, board, preset.width, preset.height, input.visualPlan);
+          currentBoard = window.boardIndex;
         }
 
-        // Scene-relative, because reveal times are stored relative to the scene.
-        const sceneMs = ((entry.frame - window.startFrame) / preset.fps) * 1000;
-        await page.evaluate(`window.__seekTo(${sceneMs})`);
+        // Board-relative: the document spans the whole build, and its reveal
+        // times and step starts are both stamped on the board's own clock.
+        const boardMs = ((entry.frame - window.startFrame) / preset.fps) * 1000;
+        await page.evaluate(`window.__seekTo(${boardMs})`);
 
         /**
          * The cross-fade at a scene boundary.
@@ -132,11 +143,11 @@ export class PlaywrightSceneRenderer implements SceneRendererPort {
     };
   }
 
-  private async loadScene(
-    page: Page, scene: Scene, width: number, height: number, visualPlan?: VisualPlan,
+  private async loadBoard(
+    page: Page, board: Board, width: number, height: number, visualPlan?: VisualPlan,
   ): Promise<void> {
-    const html = buildSceneDocument({
-      scene, theme: this.theme, width, height, ...(visualPlan ? { visualPlan } : {}),
+    const html = buildBoardDocument({
+      board, theme: this.theme, width, height, ...(visualPlan ? { visualPlan } : {}),
     });
     // `domcontentloaded` rather than `load`: there is nothing external to wait
     // for, and `load` would sit until the blocked requests time out.
@@ -171,28 +182,32 @@ export class PlaywrightSceneRenderer implements SceneRendererPort {
 }
 
 /**
- * Cross-fade length at a scene boundary.
+ * Cross-fade length at a **board** boundary.
  *
  * Short on purpose. Every frame it spans has to be drawn individually — a
  * boundary costs roughly 2 x fps x (ms/1000) renders where a hard cut cost
  * none — so this trades a measurable slice of render time for the single
  * clearest signal that a video was edited rather than assembled.
+ *
+ * There are far fewer of these than there used to be: a fade now marks a new
+ * diagram rather than a new sentence, so a board narrated over four scenes pays
+ * for one instead of four.
  */
-const SCENE_TRANSITION_MS = 180;
+const BOARD_TRANSITION_MS = 180;
 
 function framePath(dir: string, frame: number): string {
   return join(dir, `f${String(frame).padStart(6, '0')}.png`);
 }
 
-/** The scene that owns a given absolute frame. */
-function windowFor(storyboard: Storyboard, frame: number): SceneWindow | undefined {
-  for (const window of storyboard.windows) {
+/** The board that owns a given absolute frame. */
+function boardWindowFor(storyboard: Storyboard, frame: number): BoardWindow | undefined {
+  for (const window of storyboard.boardWindows) {
     if (frame >= window.startFrame && frame < window.endFrame) return window;
   }
-  // Frames in the inter-scene gap belong to the scene that just ended, so the
-  // board holds rather than going blank.
-  let last: SceneWindow | undefined;
-  for (const window of storyboard.windows) {
+  // Frames in the gap between boards belong to the board that just ended, so it
+  // holds rather than going blank.
+  let last: BoardWindow | undefined;
+  for (const window of storyboard.boardWindows) {
     if (window.startFrame <= frame) last = window;
   }
   return last;

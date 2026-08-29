@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { StubStoryboardGenerator } from '@infrastructure/stub/StubStoryboardGenerator.js';
 import { DeterministicSceneChecks } from '@infrastructure/judge/DeterministicSceneChecks.js';
+import { Board } from '@domain/script/Board.js';
 import { DIAGRAM_SHAPES, type DiagramShape } from '@domain/script/DiagramShape.js';
 import { Scene } from '@domain/script/Scene.js';
 import { SceneTimeline } from '@domain/script/SceneTimeline.js';
@@ -32,7 +33,7 @@ const failuresFor = async (html: string, anchors: Parameters<typeof SceneTimelin
  */
 describe('the storyboard fallback always draws something', () => {
   it.each(DIAGRAM_SHAPES)('produces a diagram for %s', async (shape) => {
-    const { html, anchors } = await generator.regenerate({ scene: sceneOf(shape) });
+    const { html, anchors } = await generator.regenerate({ board: Board.forScene(sceneOf(shape)) });
     const failures = await failuresFor(html, anchors);
 
     expect(failures.filter((f) => f.startsWith('A8')), `${shape} produced a text-only board`).toEqual([]);
@@ -40,7 +41,7 @@ describe('the storyboard fallback always draws something', () => {
 
   it('passes every Stage A check, not just the diagram one', async () => {
     for (const shape of DIAGRAM_SHAPES) {
-      const { html, anchors } = await generator.regenerate({ scene: sceneOf(shape) });
+      const { html, anchors } = await generator.regenerate({ board: Board.forScene(sceneOf(shape)) });
       expect(await failuresFor(html, anchors), shape).toEqual([]);
     }
   });
@@ -56,7 +57,7 @@ describe('the storyboard fallback always draws something', () => {
 
   it('never emits a bullet list for any shape', async () => {
     for (const shape of DIAGRAM_SHAPES) {
-      const { html } = await generator.regenerate({ scene: sceneOf(shape) });
+      const { html } = await generator.regenerate({ board: Board.forScene(sceneOf(shape)) });
       expect(html, shape).not.toMatch(/<ul|<ol/);
     }
   });
@@ -64,7 +65,7 @@ describe('the storyboard fallback always draws something', () => {
   it('varies the shape it draws, rather than one layout for everything', async () => {
     const bodies = new Set<string>();
     for (const shape of DIAGRAM_SHAPES) {
-      const { html } = await generator.regenerate({ scene: sceneOf(shape) });
+      const { html } = await generator.regenerate({ board: Board.forScene(sceneOf(shape)) });
       bodies.add(html.replace(/<h2[\s\S]*?<\/h2>/, ''));
     }
     expect(bodies.size).toBeGreaterThan(3);

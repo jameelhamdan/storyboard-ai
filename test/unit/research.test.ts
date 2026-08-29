@@ -7,14 +7,10 @@ import type { PipelineContext } from '@application/pipeline/PipelineContext.js';
 import type { ValidatedInput } from '@application/pipeline/stage/types.js';
 import type { WebSearchPort, SearchHit } from '@application/port/WebSearchPort.js';
 import type { LlmClientPort } from '@application/port/LlmClientPort.js';
-import { GeminiGroundedSearch } from '@infrastructure/search/GeminiGroundedSearch.js';
 import { ResearchPolicy, type ResearchMode } from '@domain/policy/ResearchPolicy.js';
 import { ExtraDirection } from '@domain/media/VideoStyle.js';
 import { SharedVolumeWorkspace } from '@infrastructure/storage/SharedVolumeWorkspace.js';
 import { CostMeter, DEFAULT_PRICING } from '@infrastructure/observability/CostMeter.js';
-import { createLogger } from '@infrastructure/observability/logger.js';
-
-const logger = createLogger({ level: 'silent', redactPaths: [] });
 afterEach(() => vi.unstubAllGlobals());
 
 /** Answers with a fixed page list, and records what it was asked. */
@@ -234,62 +230,3 @@ describe('ResearchTopicStage', () => {
   });
 });
 
-/**
- * Asked a question it already knows, the model answers from memory and returns
- * no grounding at all — verified against the live API. The instruction to search
- * is what makes this a search engine rather than a chat.
- */
-describe('GeminiGroundedSearch', () => {
-  const search = () => new GeminiGroundedSearch({
-    apiKey: 'k', model: 'test-model', requestTimeoutMs: 5000, baseUrl: 'https://gen.example',
-  }, logger);
-
-  it('tells the model to search, and keeps only the URLs', async () => {
-    const seen: any[] = [];
-    vi.stubGlobal('fetch', async (_url: URL, init: RequestInit) => {
-      seen.push(JSON.parse(init.body as string));
-      return new Response(JSON.stringify({
-        candidates: [{
-          content: { parts: [{ text: 'a long prose answer nobody asked for' }] },
-          groundingMetadata: {
-            groundingChunks: [
-              { web: { uri: 'https://redirect.example/1', title: 'nih.gov' } },
-              { web: { uri: 'https://redirect.example/2', title: 'britannica.com' } },
-            ],
-          },
-        }],
-      }), { status: 200, headers: { 'content-type': 'application/json' } });
-    });
-
-    const hits = await search().search({ query: 'stomata', limit: 5 });
-
-    expect(seen[0].tools).toEqual([{ google_search: {} }]);
-    expect(seen[0].contents[0].parts[0].text).toContain('Use the search tool');
-    expect(hits.map((hit) => hit.url)).toEqual([
-      'https://redirect.example/1', 'https://redirect.example/2',
-    ]);
-    // The model's own answer is a claim with no source attached; it is dropped.
-    expect(JSON.stringify(hits)).not.toContain('prose answer');
-  });
-
-  it('returns nothing when the model chose not to search', async () => {
-    vi.stubGlobal('fetch', async () => new Response(
-      JSON.stringify({ candidates: [{ content: { parts: [{ text: 'I know this already' }] } }] }),
-      { status: 200, headers: { 'content-type': 'application/json' } },
-    ));
-
-    expect(await search().search({ query: 'stomata', limit: 5 })).toEqual([]);
-  });
-
-  it('honours the limit', async () => {
-    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({
-      candidates: [{
-        groundingMetadata: {
-          groundingChunks: [1, 2, 3, 4].map((n) => ({ web: { uri: `https://e.example/${n}`, title: 'e' } })),
-        },
-      }],
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
-
-    expect(await search().search({ query: 'x', limit: 2 })).toHaveLength(2);
-  });
-});

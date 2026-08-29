@@ -103,14 +103,62 @@ describe('scene transitions', () => {
 
   const options = { revealMs: 260, fps: 24, transitionMs: 180 };
 
-  it('is undefined away from a boundary and 0..1 across one', () => {
+  /**
+   * A dip, not a ramp. Only one scene's document is loaded at a time, so the
+   * outgoing board fades *down* to the background and the incoming one fades up
+   * from it. A monotonic 0 → 1 ramp across the boundary would apply the low half
+   * to the outgoing scene, fading it up from invisible instead of out.
+   */
+  it('dips to the background at a boundary and is undefined away from one', () => {
     const b = board();
     const boundary = b.windows[1]!.startFrame;
 
     expect(transitionProgress(b, boundary - 20, options)).toBeUndefined();
-    expect(transitionProgress(b, boundary, options)).toBeCloseTo(0.5, 5);
-    expect(transitionProgress(b, boundary - 4, options)).toBeLessThan(0.5);
-    expect(transitionProgress(b, boundary + 4, options)).toBeGreaterThan(0.5);
+    // Fully faded out exactly on the boundary...
+    expect(transitionProgress(b, boundary, options)).toBeCloseTo(0, 5);
+    // ...and fully opaque at both ends of the window.
+    expect(transitionProgress(b, boundary - 4, options)).toBeCloseTo(1, 5);
+    expect(transitionProgress(b, boundary + 4, options)).toBeCloseTo(1, 5);
+    // Monotonic on each side, so the outgoing board darkens rather than brightens.
+    expect(transitionProgress(b, boundary - 3, options)!)
+      .toBeLessThan(transitionProgress(b, boundary - 4, options)!);
+    expect(transitionProgress(b, boundary + 3, options)!)
+      .toBeLessThan(transitionProgress(b, boundary + 4, options)!);
+  });
+
+  /**
+   * The regression this pair exists for.
+   *
+   * `planSegments` aligns segments to scene boundaries, so a boundary sitting on
+   * `segment.startFrame` is the normal case. The schedule used to skip those
+   * fade frames while `transitionProgress` still reported a partial opacity for
+   * them, so the segment's first frame was rendered half-faded and then *held*
+   * as a still for the whole run.
+   */
+  it('renders every frame it reports an opacity for, including at a segment start', () => {
+    const b = board();
+    const boundary = b.windows[1]!.startFrame;
+    const segment = { index: 1, startFrame: boundary, endFrame: b.totalFrames };
+
+    const drawn = new Set(scheduleFrames(b, segment, options).map((f) => f.frame));
+
+    for (let frame = segment.startFrame; frame < segment.endFrame; frame += 1) {
+      if (transitionProgress(b, frame, options) !== undefined) {
+        expect(drawn.has(frame)).toBe(true);
+      }
+    }
+  });
+
+  it('never holds a partially-faded frame as a still', () => {
+    const b = board();
+    const boundary = b.windows[1]!.startFrame;
+    const segment = { index: 1, startFrame: boundary, endFrame: b.totalFrames };
+
+    for (const entry of scheduleFrames(b, segment, options)) {
+      const fade = transitionProgress(b, entry.frame, options);
+      // A frame mid-dip may only ever cover itself.
+      if (fade !== undefined && fade < 1) expect(entry.holdFrames).toBe(1);
+    }
   });
 
   it('is deterministic — the same frame always yields the same opacity', () => {

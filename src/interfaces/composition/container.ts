@@ -78,7 +78,6 @@ import { WebSearchImageSource } from '@infrastructure/image/WebSearchImageSource
 import { TracingIllustrationFinder } from '@infrastructure/image/TracingIllustrationFinder.js';
 import type { WebSearchPort } from '@application/port/WebSearchPort.js';
 import { BraveSearchClient, BraveWebSearch } from '@infrastructure/search/BraveSearchClient.js';
-import { GeminiGroundedSearch } from '@infrastructure/search/GeminiGroundedSearch.js';
 import { DuckDuckGoSearch } from '@infrastructure/search/DuckDuckGoSearch.js';
 import { OpenverseImageSource } from '@infrastructure/image/OpenverseImageSource.js';
 import { UnsplashImageSource } from '@infrastructure/image/UnsplashImageSource.js';
@@ -112,6 +111,16 @@ export interface Container {
   readonly stages: readonly AnyStage[];
   /** Built lazily: the API never consumes, so it never pays for the connection. */
   readonly buildConsumer: () => JobConsumerPort;
+  /**
+   * A cost meter priced for the drivers this container actually selected.
+   *
+   * Exposed because the end-to-end runner meters its own in-process run, and it
+   * was building one straight from `DEFAULT_PRICING` — so it missed every
+   * per-driver override and reported ElevenLabs' per-character rate for a stub
+   * that spends nothing. A run's own summary is the first place anyone looks at
+   * cost; it has to come from the same place the job's `cost.json` does.
+   */
+  readonly newCostMeter: () => CostMeter;
   readonly sweepOrphans: () => Promise<number>;
   readonly close: () => Promise<void>;
 }
@@ -265,7 +274,18 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
     ? 0.36
     : aligner?.name === 'gemini' ? 0.10 : 0;
 
-  const pricing = env.TTS_DRIVER === 'openai'
+  /**
+   * What a search query costs, by the engine that answers it.
+   *
+   * A flat rate used to be applied to every driver, so a DuckDuckGo `deep` job
+   * reported about twenty cents of spend that no invoice will ever contain —
+   * more than the per-minute target for the whole video. A cost report that
+   * invents money is worse than one that omits it: it is the number the pricing
+   * tier gets set from.
+   */
+  const searchPerQuery = env.WEB_SEARCH_DRIVER === 'brave' ? 0.005 : 0;
+
+  const ttsPricing = env.TTS_DRIVER === 'openai'
     ? { ...DEFAULT_PRICING, ttsPerMillionChars: 15.0, ttsAlignmentPerAudioHour: 0.36 }
     : env.TTS_DRIVER === 'gemini'
       /**
@@ -283,7 +303,18 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
           ttsPerMillionChars: 18.0,
           ttsAlignmentPerAudioHour: alignmentPerAudioHour,
         }
-      : DEFAULT_PRICING;
+      /**
+       * The stub synthesises silence locally and bills nobody, so it prices at
+       * zero rather than inheriting ElevenLabs' per-character rate. It used to
+       * inherit it, and every credential-free run in `out/` reports about four
+       * cents of TTS against `llm_usd: 0` — a number contradicting the one
+       * promise the stub path makes.
+       */
+      : env.TTS_DRIVER === 'stub'
+        ? { ...DEFAULT_PRICING, ttsPerMillionChars: 0, ttsAlignmentPerAudioHour: 0 }
+        : DEFAULT_PRICING;
+
+  const pricing = { ...ttsPricing, searchPerQuery };
 
   const prompts = new PromptLibrary(env.PROMPT_DIR, env.PROMPT_HOT_RELOAD);
 
@@ -365,6 +396,17 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
         logger,
       );
 
+  /**
+   * Research runs on a keyless engine or not at all.
+   *
+   * Gemini's grounded search used to sit here, and it was the most expensive
+   * thing in the pipeline per unit of value: billed per *request* at $35 per
+   * thousand, on a call whose entire output is a list of URLs that the ordinary
+   * extractor then has to fetch anyway. Six queries on a `deep` job cost more
+   * than the whole rest of the video. DuckDuckGo returns the same list of URLs
+   * for nothing, and Brave stays for deployments that want an SLA and the
+   * `web_search` image source with it.
+   */
   const webSearch: WebSearchPort | undefined = brave
     ? new BraveWebSearch(brave)
     : env.WEB_SEARCH_DRIVER === 'duckduckgo'
@@ -372,14 +414,6 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
           requestTimeoutMs: env.WEB_SEARCH_TIMEOUT_MS,
           userAgent: env.IMAGE_USER_AGENT,
         })
-    : env.WEB_SEARCH_DRIVER === 'gemini'
-      ? new GeminiGroundedSearch({
-          apiKey: requireEnv(env.GEMINI_API_KEY, 'GEMINI_API_KEY'),
-          // The volume tier: this call plans searches and returns URLs, and its
-          // output is checked by whether the pages exist.
-          model: env.GEMINI_MODEL_VOLUME,
-          requestTimeoutMs: env.WEB_SEARCH_TIMEOUT_MS,
-        }, logger)
       : undefined;
 
   const llm: LlmClientPort | undefined = env.LLM_DRIVER === 'openai'
@@ -577,6 +611,7 @@ export function buildContainer(config: LoadedConfig, logger: Logger): Container 
       repository, workspace, clock, resolved, logger,
       () => new CostMeter(pricing, providerNames),
     ),
+    newCostMeter: () => new CostMeter(pricing, providerNames),
     sweepOrphans: () => sharedVolume.sweepOrphans(config.raw.workspace.orphanSweepAfterSeconds),
     close: async () => {
       await browsers.close();

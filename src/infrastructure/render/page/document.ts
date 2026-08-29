@@ -2,13 +2,21 @@ import { readFileSync } from 'node:fs';
 import type { Theme } from '@domain/media/Theme.js';
 import type { VisualPlan } from '@domain/media/VisualPlan.js';
 import type { Scene } from '@domain/script/Scene.js';
+import { Board } from '@domain/script/Board.js';
 import { fontPath } from '../fonts.js';
 import { HtmlSanitizer } from '../HtmlSanitizer.js';
 import { SEEK_SCRIPT } from './seek.js';
 import { BASE_STYLESHEET, IDENTITY_LOCK } from './stylesheet.js';
 
 export interface DocumentInput {
-  readonly scene: Scene;
+  /**
+   * The board to draw — one diagram and the consecutive scenes narrated over it.
+   *
+   * The rendering unit is the board rather than the scene, because a board is
+   * exactly the span over which the markup does not change. Loading a fresh
+   * document per scene is what used to make every scene boundary a wipe.
+   */
+  readonly board: Board;
   readonly theme: Theme;
   readonly width: number;
   readonly height: number;
@@ -25,17 +33,32 @@ export interface DocumentInput {
  * so the face travels as a data URI rather than as a path the browser might not
  * resolve.
  */
-export function buildSceneDocument(input: DocumentInput): string {
-  const { scene, theme, width, height, visualPlan } = input;
+export function buildBoardDocument(input: DocumentInput): string {
+  const { board, theme, width, height, visualPlan } = input;
 
   // Sanitised here as well as at the judge, because this is the last point
   // before the markup reaches a browser and the two call sites can drift.
-  const { html } = new HtmlSanitizer().sanitize(scene.html ?? '');
-  const body = injectRevealTimes(html, scene);
+  const { html } = new HtmlSanitizer().sanitize(board.html ?? '');
+  const body = injectRevealTimes(html, board);
+
+  /**
+   * Where each step begins on the board's own clock.
+   *
+   * The browser cannot work this out: it is the scenes' measured audio
+   * durations, which exist only in Node. Carrying it as data keeps the seek
+   * script a pure function of the time it is given, which is what makes a
+   * segment re-rendered on another worker pixel-identical to the one it
+   * replaces.
+   */
+  const stepStarts = board.scenes
+    .map((scene) => Math.round(board.offsetOf(scene.index).ms))
+    .join(',');
 
   return `<!doctype html>
 <html data-reveal-ms="${theme.tokens.motion.revealMs}"
       data-stagger-ms="${theme.tokens.motion.staggerMs}"
+      data-step-starts="${stepStarts}"
+      data-step-dim-ms="${theme.tokens.motion.revealMs * 2}"
       data-vignette="${theme.tokens.board.vignette}">
 <head>
 <meta charset="utf-8">
@@ -79,21 +102,32 @@ ${body}
  * Written as attributes rather than injected CSS because `__seekTo` reads them
  * per element on every frame, and an attribute is the cheapest thing to query.
  */
-function injectRevealTimes(html: string, scene: Scene): string {
+function injectRevealTimes(html: string, board: Board): string {
   let output = html;
+
+  /**
+   * Board-relative, not scene-relative.
+   *
+   * Each scene resolves its anchors against its own measured word timings —
+   * those phrases appear in that scene's narration and nowhere else — but the
+   * page spans the whole board and is seeked on the board's clock. `Board.reveals`
+   * applies the offset. Skipping it would draw every step's elements at the times
+   * they would have had if their scene started the board.
+   */
+  const reveals = board.reveals;
 
   // Reveals landing on the same millisecond are a group; their order within it
   // decides the stagger offset. `reveals` is already sorted by resolved time.
   const orderAtSameTime = new Map<string, number>();
   const seenAt = new Map<number, number>();
-  for (const reveal of scene.timeline.reveals) {
+  for (const reveal of reveals) {
     const ms = Math.max(0, Math.round(reveal.at.ms));
     const index = seenAt.get(ms) ?? 0;
     orderAtSameTime.set(reveal.elementId, index);
     seenAt.set(ms, index + 1);
   }
 
-  for (const reveal of scene.timeline.reveals) {
+  for (const reveal of reveals) {
     const ms = Math.max(0, Math.round(reveal.at.ms));
     const order = orderAtSameTime.get(reveal.elementId) ?? 0;
 
@@ -145,4 +179,19 @@ function fontFace(): string {
   src: url(data:font/ttf;base64,${base64}) format('truetype');
 }`;
   return cachedFontFace;
+}
+
+/**
+ * The page for a single scene, as a board of one step.
+ *
+ * A convenience for the callers that hold one scene and mean it — the previewer
+ * photographing one attempt, the shape screenshots, tests building a fixture.
+ * A one-step board dims nothing and gates nothing, so this is exactly the
+ * behaviour these callers had before boards existed.
+ */
+export function buildSceneDocument(
+  input: Omit<DocumentInput, 'board'> & { readonly scene: Scene },
+): string {
+  const { scene, ...rest } = input;
+  return buildBoardDocument({ ...rest, board: Board.forScene(scene) });
 }

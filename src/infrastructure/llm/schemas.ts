@@ -52,6 +52,16 @@ export const scriptSchema = {
           // An enum, not a sentence: a scene whose shape was described in prose
           // reliably came back as a title and a bullet list.
           visualIntent: { type: 'string', enum: [...DIAGRAM_SHAPES] },
+          /**
+           * Keep the previous scene's board and add to it, rather than wiping to
+           * a new one. Requires the same visualIntent as the scene it continues.
+           */
+          continuesBoard: {
+            type: 'boolean',
+            description:
+              'True to build on the previous scene\'s diagram instead of starting a new one. ' +
+              'Only valid when visualIntent matches the previous scene\'s.',
+          },
         },
         required: ['sentences', 'visualIntent'],
       },

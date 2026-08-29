@@ -30,6 +30,13 @@ export class PromptedVisionReader implements VisionReaderPort {
       user: prompt.user || 'Transcribe everything legible in this image.',
       tier: 'quality',
       responseSchema: visionSchema as unknown as Record<string, unknown>,
+      /**
+       * A transcription of one image, so the ceiling has to hold a dense slide
+       * — this is the one call here whose legitimate output can be long, and
+       * truncating it silently drops source material the script would have
+       * cited. Sized for a full page of text rather than for a caption.
+       */
+      maxOutputTokens: 4096,
       images: [{ mimeType: input.mimeType, base64: input.imageBase64 }],
       ...(input.signal ? { signal: input.signal } : {}),
     });

@@ -43,6 +43,21 @@ export const STAGE_ORDER: readonly StageName[] = [
   'judgeStoryboard', 'synthesize', 'subtitles', 'quiz', 'render', 'assemble', 'publish',
 ];
 
+/**
+ * Stages the pipeline can legitimately be assembled without.
+ *
+ * `research` is only built when the deployment has a search engine *and* a real
+ * LLM to plan queries with, and the composition root leaves it out entirely
+ * rather than wiring an inert one. The completeness check below did not know
+ * that, so it rejected every assembly missing it — which is every credential-free
+ * run, the one path the README promises works with no keys at all.
+ *
+ * Being absent is not the same as being skipped: a stage present but turned off
+ * for one job (`planReview` under `features.plan_review: false`) still has to be
+ * wired, because another job on the same worker may want it.
+ */
+export const OPTIONAL_STAGES: ReadonlySet<StageName> = new Set<StageName>(['research']);
+
 export const TOTAL_WEIGHT: number = (Object.values(STAGE_WEIGHTS) as number[])
   .reduce((total, weight) => total + weight, 0);
 

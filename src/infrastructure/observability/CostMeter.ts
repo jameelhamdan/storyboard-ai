@@ -58,14 +58,28 @@ export class CostMeter implements CostMeterPort {
     const model = usage.model ?? 'unknown';
     const rates = this.pricing.llm[model];
 
+    /**
+     * Cached tokens are a *subset* of the input count, not a separate bucket.
+     *
+     * Both providers report it that way — OpenAI's `prompt_tokens` includes
+     * `prompt_tokens_details.cached_tokens`, and Gemini's `promptTokenCount`
+     * includes `cachedContentTokenCount` — so the cached share has to be
+     * subtracted before the full rate is applied to the remainder. Adding the
+     * two rates instead billed a cached token at `input + cachedInput`, which
+     * made caching look like it *raised* the bill: the one signal that would
+     * tell us the largest available saving is working.
+     */
+    const cached = Math.min(usage.cachedInputTokens ?? 0, usage.inputTokens);
+    const freshInput = usage.inputTokens - cached;
+
     // An unpriced model must not silently cost zero — that would make a cost
     // report that reconciles against no invoice. Units are still recorded so the
     // gap is visible in the metadata.
     const amount = rates
       ? Money.fromUsd(
-          (usage.inputTokens / 1_000_000) * rates.input +
+          (freshInput / 1_000_000) * rates.input +
           (usage.outputTokens / 1_000_000) * rates.output +
-          ((usage.cachedInputTokens ?? 0) / 1_000_000) * (rates.cachedInput ?? rates.input),
+          (cached / 1_000_000) * (rates.cachedInput ?? rates.input),
         )
       : Money.zero();
 
@@ -176,6 +190,8 @@ export const DEFAULT_PRICING: PricingTable = {
     // not a number to average out.
     'gemini-3.7-flash': { input: 0.75, output: 3.75, cachedInput: 0.075 },
     'gemini-3.5-flash': { input: 1.50, output: 9.00, cachedInput: 0.15 },
+    'gemini-3.5-flash-lite': { input: 0.30, output: 2.50, cachedInput: 0.03 },
+    'gemini-3.1-flash-lite': { input: 0.25, output: 1.50, cachedInput: 0.025 },
     'gemini-3-flash-preview': { input: 0.50, output: 3.00, cachedInput: 0.05 },
     // Prompts over 200k tokens are billed at double this. A consolidated source
     // document reaching that size is possible, so the figure is a floor.
@@ -209,7 +225,13 @@ export const DEFAULT_PRICING: PricingTable = {
   sttPerAudioHour: 0,
   renderPerCoreHour: 0.02,
   storagePerGbMonth: 0.015,
-  // Gemini charges grounded prompts per request rather than per query; $35 per
-  // thousand is the published rate, and one research round is one request.
-  searchPerQuery: 0.035,
+  /**
+   * Free by default, because the default engine is free.
+   *
+   * Research runs on DuckDuckGo or Brave, and both bill per query — DuckDuckGo
+   * at nothing. The composition root sets the rate from the driver; a flat rate
+   * here used to be applied to every engine, which put about twenty cents of
+   * imaginary spend on a keyless `deep` job.
+   */
+  searchPerQuery: 0,
 };

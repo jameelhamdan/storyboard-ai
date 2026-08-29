@@ -21,8 +21,8 @@ citation still points at the original chunk.
 
 ### Output
 
-Return JSON matching the provided schema: an ordered list of scenes, each with `sentences` and
-`visualIntent`.
+Return JSON matching the provided schema: an ordered list of scenes, each with `sentences`,
+`visualIntent` and `continuesBoard`.
 
 - **`sentences`** — what the voice says, one entry per sentence, in order. Together they should read
   aloud as 15–40 words per scene. Written to be heard, not read: no bullet fragments, no
@@ -84,11 +84,45 @@ Return JSON matching the provided schema: an ordered list of scenes, each with `
   When an idea seems to have no shape, it is `focus`: the one idea set large with a drawn mark
   around it. That is still a drawing. It is never a list.
 
+### Building one diagram across scenes — `continuesBoard`
+
+This is the single most important decision you make about how the video *reads*.
+
+A scene that sets `continuesBoard: true` **keeps the previous scene's diagram on screen and adds to
+it.** The board is drawn once and grows: the part you are explaining now arrives and takes the
+focus, and everything already drawn stays where it is and quietly recedes. A scene that leaves it
+false wipes the board and starts a new picture.
+
+Good explainers almost never wipe. They put a diagram up, then walk around it — adding the second
+box, then the arrow, then the thing the arrow leads to — so the viewer keeps the whole idea in view
+while each part is explained. A video that wipes every eight seconds makes the viewer rebuild the
+context from nothing every time, and it is the difference between a lesson and a slideshow.
+
+**So: continue by default, and break only when the subject genuinely changes.**
+
+Three rules, and the first two are hard:
+
+- **The first scene cannot continue anything.** Leave it false.
+- **A continuing scene must repeat the previous scene's `visualIntent` exactly.** A board is one
+  diagram; you cannot continue a `flow` as a `matrix`. If the next idea needs a different shape,
+  that is precisely when to start a new board.
+- **A board may not have more steps than its shape has room for.** Each scene on a board must add at
+  least one new node or edge, and the shape's node limit is for the *whole board*, not per scene. So
+  `comparison` (exactly 2 nodes) can hold at most two scenes; `focus` (1 node) is always a single
+  scene; `flow`, `tree`, `stack`, `timeline` and `parts` comfortably hold three or four.
+
+Aim for boards of **two to four scenes**. One long board is not better than two good ones — when the
+picture is full, or the subject has moved on, wipe and start the next.
+
 ### Scenes
 
 One idea per scene. Split when the subject changes; do not split a single idea across scenes just to
 hit a count. Aim for a total narration length that reads aloud in about {{target_duration_seconds}}
 seconds at ~150 words per minute.
+
+**A scene is a step, not a slide.** Because scenes build on one board, a scene may be one *part* of
+an idea — introduce the mechanism, then add what drives it, then add what it produces. That is three
+scenes on one diagram, and it is better than one scene that says all three at once.
 
 **Use the budget.** It is the length the video was commissioned at, not a ceiling to stay well under.
 Do not pad with restatement — but a script that lands far short is not "safely accurate", it is a

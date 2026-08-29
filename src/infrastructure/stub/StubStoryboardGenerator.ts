@@ -1,5 +1,6 @@
 import type { StoryboardGeneratorPort, GeneratedStoryboard } from '@application/port/StoryboardGeneratorPort.js';
 import type { Scene } from '@domain/script/Scene.js';
+import { Board } from '@domain/script/Board.js';
 import { SceneDiagram, type DiagramNode, type DiagramEdge } from '@domain/script/SceneDiagram.js';
 import { SHAPE_LIMITS, type DiagramShape } from '@domain/script/DiagramShape.js';
 import { renderDiagram } from '../render/diagram/renderDiagram.js';
@@ -19,12 +20,12 @@ import { renderDiagram } from '../render/diagram/renderDiagram.js';
  * language.
  */
 export class StubStoryboardGenerator implements StoryboardGeneratorPort {
-  public async generate(input: { scenes: readonly Scene[] }): Promise<readonly GeneratedStoryboard[]> {
-    return input.scenes.map((scene) => this.build(scene));
+  public async generate(input: { boards: readonly Board[] }): Promise<readonly GeneratedStoryboard[]> {
+    return input.boards.map((board) => this.build(board));
   }
 
-  public async regenerate(input: { scene: Scene }): Promise<GeneratedStoryboard> {
-    return this.build(input.scene);
+  public async regenerate(input: { board: Board }): Promise<GeneratedStoryboard> {
+    return this.build(input.board);
   }
 
   /**
@@ -39,7 +40,7 @@ export class StubStoryboardGenerator implements StoryboardGeneratorPort {
   public fallback(scene: Scene): GeneratedStoryboard {
     const sentence = firstSentence(scene.writtenText);
     return this.render(
-      scene,
+      Board.forScene(scene),
       SceneDiagram.of({
         shape: 'focus',
         title: titleFor(scene),
@@ -49,7 +50,9 @@ export class StubStoryboardGenerator implements StoryboardGeneratorPort {
     );
   }
 
-  private build(scene: Scene): GeneratedStoryboard {
+  private build(board: Board): GeneratedStoryboard {
+    const scene = board.firstScene;
+
     /**
      * `illustration` becomes `focus` here, and there is no stub version of it.
      *
@@ -60,39 +63,88 @@ export class StubStoryboardGenerator implements StoryboardGeneratorPort {
      * placeholder image would make a stub run look like a working feature, and
      * an empty plate would render as a credit line under a hole.
      */
-    const shape = scene.visualIntent === 'illustration' ? 'focus' : scene.visualIntent;
+    const shape = board.visualIntent === 'illustration' ? 'focus' : board.visualIntent;
     const limits = SHAPE_LIMITS[shape];
-    const phrases = clausesOf(scene.spokenText);
 
-    // Meet the shape's minimum; never exceed its maximum. Both are hard — the
-    // diagram is rejected outside the range, and a stub that cannot satisfy its
-    // own domain rules is worse than useless.
-    const wanted = Math.min(Math.max(limits.min, Math.min(phrases.length, 3)), limits.max);
-    const chosen = phrases.slice(0, wanted);
-    while (chosen.length < limits.min) chosen.push(chosen[chosen.length - 1] ?? scene.spokenText);
+    /**
+     * A node budget the board can actually satisfy.
+     *
+     * Two floors meet here: the shape's own minimum, and one node per step,
+     * because a step that adds nothing to the board is rejected. The shape's
+     * maximum caps both — which is also why the script stage may not open a
+     * board with more steps than its shape has room for.
+     */
+    const steps = Math.min(board.steps, limits.max);
+    const wanted = Math.min(Math.max(limits.min, steps, 3), limits.max);
 
-    const nodes: DiagramNode[] = chosen.map((phrase, i) => ({
-      id: `n${i}`,
-      label: clampWords(phrase, limits.labelWords),
-      // Anchors must be verbatim substrings of the spoken text, so they are the
-      // clause itself rather than the shortened label.
-      anchor: phrase,
-      ...(shape === 'proportion' ? { value: 1 - i * 0.25 } : {}),
-    }));
+    /**
+     * Nodes drawn from each step's *own* narration.
+     *
+     * An anchor has to be a verbatim substring of the scene that speaks it, so a
+     * node belonging to step 2 takes its phrase from scene 2. Taking them all
+     * from the first scene would produce a board whose later steps never resolve
+     * and silently inherit the previous element's time.
+     */
+    const nodes: DiagramNode[] = [];
+    for (let i = 0; i < wanted; i += 1) {
+      const step = steps === 0 ? 1 : (i % steps) + 1;
+      const source = board.scenes[Math.min(step - 1, board.scenes.length - 1)]!;
+      const phrases = clausesOf(source.spokenText);
+      const phrase = phrases[Math.floor(i / Math.max(steps, 1))] ?? phrases[0] ?? source.spokenText;
 
-    return this.render(scene, SceneDiagram.of({
-      shape,
-      title: titleFor(scene),
-      nodes,
-      edges: edgesFor(shape, nodes),
-      ...(shape === 'matrix' ? { axes: { x: 'more', y: 'less' } } : {}),
-    }), false);
+      nodes.push({
+        id: `n${i}`,
+        label: clampWords(phrase, limits.labelWords),
+        anchor: phrase,
+        ...(board.steps > 1 ? { step } : {}),
+        ...(shape === 'proportion' ? { value: 1 - i * 0.25 } : {}),
+      });
+    }
+
+    // Sorted by step so the ids run in the order the board builds, which is what
+    // the templates lay out along their axis.
+    nodes.sort((a, b) => (a.step ?? 1) - (b.step ?? 1));
+
+    /**
+     * A description that will not validate becomes the fallback board, never an
+     * exception.
+     *
+     * `groupIntoBoards` already guarantees a board its shape can express, so
+     * reaching this means something upstream changed — and this class is also
+     * the *production* fallback, where a throw would take down a job that was
+     * being rescued. The prompted generator has always treated invalid output
+     * this way; the stub used to throw, which made it the more fragile of the
+     * two on exactly the path that exists to be safe.
+     */
+    try {
+      return this.render(board, SceneDiagram.of({
+        shape,
+        title: titleFor(scene),
+        nodes,
+        edges: edgesFor(shape, nodes),
+        ...(board.steps > 1 ? { steps: board.steps } : {}),
+        ...(shape === 'matrix' ? { axes: { x: 'more', y: 'less' } } : {}),
+      }), false);
+    } catch {
+      return this.fallback(scene);
+    }
   }
 
-  private render(scene: Scene, diagram: SceneDiagram, usedFallback: boolean): GeneratedStoryboard {
+  /**
+   * A board's result names *every* scene it covers.
+   *
+   * They share one document, and the storyboard stage keys its results by scene
+   * — so a board that reported only its first scene left the rest looking like
+   * scenes the generator never answered for, and each was quietly replaced by
+   * the built-in board. Four of nine scenes in a stub run, and the video still
+   * rendered, which is exactly how it went unnoticed.
+   */
+  private render(board: Board, diagram: SceneDiagram, usedFallback: boolean): GeneratedStoryboard {
+    const scene = board.firstScene;
     const rendered = renderDiagram(diagram, scene.index);
     return {
       sceneIndex: scene.index,
+      sceneIndexes: board.sceneIndexes,
       html: rendered.html,
       anchors: rendered.anchors,
       usage: { inputTokens: 0, outputTokens: 0, model: 'stub' },
@@ -104,7 +156,13 @@ export class StubStoryboardGenerator implements StoryboardGeneratorPort {
 /** Only the shapes whose templates draw connectors need edges. */
 function edgesFor(shape: DiagramShape, nodes: readonly DiagramNode[]): DiagramEdge[] {
   if (!['flow', 'cycle', 'equation'].includes(shape)) return [];
-  return nodes.slice(1).map((node, i) => ({ from: nodes[i]!.id, to: node.id }));
+  // An edge arrives with the node it points at: the connector into a box is part
+  // of that box's step, not of the step that drew the box it comes from.
+  return nodes.slice(1).map((node, i) => ({
+    from: nodes[i]!.id,
+    to: node.id,
+    ...(node.step !== undefined ? { step: node.step } : {}),
+  }));
 }
 
 /**

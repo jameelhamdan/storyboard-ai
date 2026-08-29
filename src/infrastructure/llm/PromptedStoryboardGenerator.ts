@@ -1,5 +1,6 @@
 import type { StoryboardGeneratorPort, GeneratedStoryboard } from '@application/port/StoryboardGeneratorPort.js';
 import type { Scene } from '@domain/script/Scene.js';
+import type { Board } from '@domain/script/Board.js';
 import type { VisualPlan } from '@domain/media/VisualPlan.js';
 import type { GateId } from '@domain/quality/QualityScore.js';
 import type { LlmClientPort } from '@application/port/LlmClientPort.js';
@@ -64,8 +65,12 @@ const sceneDiagramSchema = {
           label: { type: 'string', description: '1-4 words.' },
           detail: { type: 'string', description: 'Optional second line.' },
           value: { type: 'number', description: 'For proportion only: 0-1, the share of the track.' },
-          emphasis: { type: 'boolean', description: 'The one focal point. At most one node.' },
+          emphasis: { type: 'boolean', description: 'The one focal point. At most one node per step.' },
           anchor: { type: 'string', description: 'Verbatim phrase from the narration this arrives on.' },
+          step: {
+            type: 'integer',
+            description: 'Which step of the build this arrives in, 1-based. Omit on a single-step board.',
+          },
         },
         required: ['id', 'label'],
       },
@@ -79,6 +84,10 @@ const sceneDiagramSchema = {
           to: { type: 'string' },
           label: { type: 'string', description: 'A word or two riding the connector.' },
           anchor: { type: 'string' },
+          step: {
+            type: 'integer',
+            description: 'Which step of the build this arrives in, 1-based. Omit on a single-step board.',
+          },
         },
         required: ['from', 'to'],
       },
@@ -142,29 +151,37 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
   ) {}
 
   public async generate(input: {
-    scenes: readonly Scene[];
+    boards: readonly Board[];
     visualPlan?: VisualPlan;
     direction?: string;
     imageSources?: readonly ImageSourceId[];
     signal?: AbortSignal;
   }): Promise<readonly GeneratedStoryboard[]> {
-    // One call per scene, run together.
-    //
-    // Scenes used to be batched into a single call that had to emit complete
-    // markup for all of them at once. That capped how elaborate any one scene
-    // could be — the whole batch shared an output budget — and when it ran out
-    // the JSON came back short and scenes went missing. Per-scene calls remove
-    // the shared budget entirely and mean a scene that fails affects only itself.
-    return Promise.all(input.scenes.map((scene) => this.ask(
-      scene,
-      this.briefFor(scene, input.visualPlan, input.direction),
-      this.illustrationContext(scene, input.imageSources, input.visualPlan),
+    /**
+     * One call per board, run together.
+     *
+     * Scenes used to be batched into a single call that had to emit complete
+     * markup for all of them at once. That capped how elaborate any one scene
+     * could be — the whole batch shared an output budget — and when it ran out
+     * the JSON came back short and scenes went missing. A board is not that
+     * batch: it is *one diagram*, so it has one description and one output
+     * budget that belongs to it, and a board that fails affects only itself.
+     *
+     * It is also where the saving is. A board narrated over three scenes used to
+     * be three calls, each carrying the full shape guidance and design brief;
+     * now it is one, and the model gets to see the whole build before deciding
+     * what arrives when — which is the only way it could place the steps well.
+     */
+    return Promise.all(input.boards.map((board) => this.ask(
+      board,
+      this.briefFor(board, input.visualPlan, input.direction),
+      this.illustrationContext(board.firstScene, input.imageSources, input.visualPlan),
       input.signal,
     )));
   }
 
   public async regenerate(input: {
-    scene: Scene;
+    board: Board;
     failedGates: readonly GateId[];
     notes: readonly string[];
     visualPlan?: VisualPlan;
@@ -173,7 +190,7 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
     signal?: AbortSignal;
   }): Promise<GeneratedStoryboard> {
     const brief = [
-      this.briefFor(input.scene, input.visualPlan, input.direction),
+      this.briefFor(input.board, input.visualPlan, input.direction),
       '',
       'Your previous attempt at this board was rejected.',
       'Fix exactly these problems and change nothing else:',
@@ -182,9 +199,9 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
     ].join('\n');
 
     return this.ask(
-      input.scene,
+      input.board,
       brief,
-      this.illustrationContext(input.scene, input.imageSources, input.visualPlan),
+      this.illustrationContext(input.board.firstScene, input.imageSources, input.visualPlan),
       input.signal,
     );
   }
@@ -196,16 +213,41 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
    * — `SceneDiagram` rejects a diagram outside it, and a rejection the model
    * could have avoided costs a full retry.
    */
-  private briefFor(scene: Scene, visualPlan?: VisualPlan, direction?: string): string {
+  private briefFor(board: Board, visualPlan?: VisualPlan, direction?: string): string {
+    const scene = board.firstScene;
     const plan = visualPlan?.forScene(scene.index);
-    const shape = scene.visualIntent;
+    const shape = board.visualIntent;
     const limits = SHAPE_LIMITS[shape];
 
+    /**
+     * The narration, split by step when there is more than one.
+     *
+     * The model has to see the whole build to place the steps, and it has to see
+     * where each step's narration begins and ends to anchor into it — an anchor
+     * is a verbatim phrase from *one* scene, and a phrase copied across a step
+     * boundary matches nothing.
+     */
+    const narration = board.steps === 1
+      ? [`Narration: ${scene.spokenText}`]
+      : [
+          `This board is built over ${board.steps} steps, one per scene below.`,
+          'Lay out the whole diagram; the step decides when each part arrives.',
+          '',
+          ...board.scenes.flatMap((s, i) => [`Step ${i + 1} narration: ${s.spokenText}`, '']),
+        ];
+
     return [
-      `Narration: ${scene.spokenText}`,
+      ...narration,
       '',
       `Shape: ${shape} — ${SHAPE_GUIDANCE[shape]}`,
-      `Nodes: between ${limits.min} and ${limits.max}.`,
+      `Nodes: between ${limits.min} and ${limits.max} for the whole board.`,
+      ...(board.steps > 1
+        ? [
+            `Every step from 1 to ${board.steps} must add at least one node or edge.`,
+            'Give each element a step. Anchor it to a phrase from that step\'s narration.',
+            'Emphasise at most one node per step — the focus moves as the build advances.',
+          ]
+        : []),
       ...(shape === 'illustration'
         ? [
             'You are not drawing this board — you are choosing what to find and what to label on it.',
@@ -231,7 +273,7 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
   }
 
   private async ask(
-    scene: Scene,
+    board: Board,
     brief: string,
     illustration: IllustrationContext,
     signal?: AbortSignal,
@@ -243,10 +285,11 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
       user: prompt.user,
       tier: 'volume',
       responseSchema: sceneDiagramSchema as unknown as Record<string, unknown>,
+      maxOutputTokens: storyboardOutputCeiling(board),
       ...(signal ? { signal } : {}),
     });
 
-    return this.build(scene, result.parsed, result.usage, illustration, signal);
+    return this.build(board, result.parsed, result.usage, illustration, signal);
   }
 
   /**
@@ -257,12 +300,13 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
    * a fallback rather than a crash.
    */
   private async build(
-    scene: Scene,
+    board: Board,
     parsed: SceneDiagramResponse | undefined,
     usage: TokenUsage,
     illustration: IllustrationContext,
     signal?: AbortSignal,
   ): Promise<GeneratedStoryboard> {
+    const scene = board.firstScene;
     if (!parsed) {
       return { ...this.fallbackGenerator.fallback(scene), usage, usedFallback: true };
     }
@@ -270,7 +314,8 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
     let diagram: SceneDiagram;
     try {
       diagram = SceneDiagram.of({
-        shape: scene.visualIntent,
+        shape: board.visualIntent,
+        steps: board.steps,
         title: parsed.title,
         nodes: parsed.nodes ?? [],
         ...(parsed.edges ? { edges: parsed.edges } : {}),
@@ -317,6 +362,7 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
     const rendered = renderDiagram(diagram, scene.index);
     return {
       sceneIndex: scene.index,
+      sceneIndexes: board.sceneIndexes,
       html: rendered.html,
       anchors: rendered.anchors,
       usage,
@@ -326,4 +372,23 @@ export class PromptedStoryboardGenerator implements StoryboardGeneratorPort {
   public fallback(scene: Scene): GeneratedStoryboard {
     return this.fallbackGenerator.fallback(scene);
   }
+}
+
+/**
+ * How much output one board's description may take.
+ *
+ * A diagram description is small — a title, a handful of nodes with short
+ * labels, some edges — and it was previously left to the client's 8192-token
+ * default, which is between ten and thirty times what any board has ever
+ * needed. An unbounded ceiling does not save money when the model is terse, but
+ * it removes the only guard against a model that starts explaining itself in
+ * prose, and it is the difference between a bad board and a bad board that cost
+ * a dollar.
+ *
+ * Scaled by steps because a built board genuinely describes more: the same node
+ * budget, but each element additionally carries a step and an anchor phrase from
+ * its own scene's narration.
+ */
+function storyboardOutputCeiling(board: Board): number {
+  return 700 + 500 * board.steps;
 }

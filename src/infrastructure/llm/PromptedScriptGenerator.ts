@@ -18,6 +18,7 @@ interface ScriptResponse {
   scenes: {
     sentences: { text: string; kind: string; citations: string[] }[];
     visualIntent: string;
+    continuesBoard?: boolean;
   }[];
 }
 
@@ -133,6 +134,16 @@ export class PromptedScriptGenerator implements ScriptGeneratorPort {
         // Guarded rather than trusted: the enum is enforced by the response
         // schema, but a provider that ignores it must not poison the shape.
         visualIntent: this.shapeFor(scene.visualIntent, index, input.imageSources),
+        /**
+         * Passed through unguarded, because `groupIntoBoards` is the guard.
+         *
+         * It already refuses a continuation whose shape disagrees with the board
+         * it is joining and one on the first scene, so a model that sets this
+         * carelessly gets a board per scene — the old behaviour — rather than a
+         * diagram that contradicts its own narration. Validating it twice would
+         * mean two places that have to agree about what a board is.
+         */
+        continuesBoard: scene.continuesBoard === true,
       });
     });
 

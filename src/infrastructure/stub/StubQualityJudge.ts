@@ -1,5 +1,5 @@
-import type { QualityJudgePort, SceneJudgement } from '@application/port/QualityJudgePort.js';
-import type { Scene } from '@domain/script/Scene.js';
+import type { QualityJudgePort, BoardJudgement } from '@application/port/QualityJudgePort.js';
+import type { Board } from '@domain/script/Board.js';
 import { GATES, HolisticScore, type GateResult } from '@domain/quality/QualityScore.js';
 
 /**
@@ -12,7 +12,7 @@ import { GATES, HolisticScore, type GateResult } from '@domain/quality/QualitySc
  * measurement.
  */
 export class StubQualityJudge implements QualityJudgePort {
-  public async judgeScene(input: { scene: Scene }): Promise<SceneJudgement> {
+  public async judgeBoard(input: { board: Board }): Promise<BoardJudgement> {
     const gates: GateResult[] = GATES.map((gate) => ({
       gate,
       passed: true,
@@ -20,7 +20,7 @@ export class StubQualityJudge implements QualityJudgePort {
     }));
 
     return {
-      sceneIndex: input.scene.index,
+      sceneIndex: input.board.firstScene.index,
       gates,
       holistic: HolisticScore.of(3),
       usage: { inputTokens: 0, outputTokens: 0, model: 'stub' },

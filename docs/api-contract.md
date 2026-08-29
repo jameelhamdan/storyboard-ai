@@ -42,7 +42,7 @@ Returns immediately — generation is asynchronous.
 |---|---|
 | `images` | Allows the `illustration` board: a real photograph or published scientific diagram, found by search, credited under the picture. Off means every board is drawn |
 | `image_sources` | Which libraries may be used, in preference order: `wikimedia`, `unsplash`, `pexels`, `web_search`. An unknown value is a `400`. Every one of them finds a picture that already exists — this service does not generate imagery |
-| `research` | `none` (default), `web_search`, or `deep`. Searches the web for the topic and ingests the results as ordinary sources — cited exactly like an upload. `deep` searches again for what the first round did not answer |
+| `research` | `none` (default), `web_search`, or `deep`. Searches the web for the topic and ingests the results as ordinary sources — cited exactly like an upload. `deep` searches again for what the first round did not answer. The engine is DuckDuckGo (free) or Brave; there is no LLM-grounded option |
 | `plan_review` | Judges the whole story — scene set, order, shape per scene — before anything is illustrated, and rewrites the script if the judge objects. Off means the script goes straight to the boards |
 
 **`image_sources` is a request, not an assertion about the server.** The job gets the intersection of

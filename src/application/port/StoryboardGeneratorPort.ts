@@ -1,4 +1,5 @@
 import type { Scene } from '@domain/script/Scene.js';
+import type { Board } from '@domain/script/Board.js';
 import type { TimelineAnchor } from '@domain/script/SceneTimeline.js';
 import type { GateId } from '@domain/quality/QualityScore.js';
 import type { TokenUsage } from './CostMeterPort.js';
@@ -14,16 +15,35 @@ export interface GeneratedStoryboard {
    * "fallback 0" while half the video is stub bullets is worse than no summary.
    */
   readonly usedFallback?: boolean;
+  /**
+   * The board this markup is for, by its first scene's index.
+   *
+   * Kept as a scene index rather than a board ordinal so a result can still be
+   * matched up when boards are regrouped — the grouping is derived from the
+   * scenes and a board's ordinal moves if an earlier continuation breaks.
+   */
   readonly sceneIndex: number;
+  /** Every scene the board covers. One entry for a board that is a single scene. */
+  readonly sceneIndexes?: readonly number[];
+  /** One document for the whole build; every scene on the board shares it. */
   readonly html: string;
+  /** Across the whole board. Each anchor names the step it belongs to. */
   readonly anchors: readonly TimelineAnchor[];
   readonly usage: TokenUsage;
 }
 
 export interface StoryboardGeneratorPort {
-  /** Batched — the LLM sees several scenes at once so style stays consistent (G5). */
+  /**
+   * One call per **board**, not per scene.
+   *
+   * A board is one diagram built over its scenes, so describing it once is both
+   * the only coherent way to author it — the model has to see the whole build to
+   * decide what arrives when — and considerably cheaper than describing it per
+   * scene, since the shape guidance and the design brief are sent once for the
+   * board instead of once for each of its scenes.
+   */
   generate(input: {
-    scenes: readonly Scene[];
+    boards: readonly Board[];
     /**
      * The video's agreed design. Without it each scene invents its own palette
      * and the video reads as ten unrelated videos spliced together.
@@ -49,7 +69,7 @@ export interface StoryboardGeneratorPort {
 
   /** Targeted regeneration: the failed gate ids tell the model what to fix. */
   regenerate(input: {
-    scene: Scene;
+    board: Board;
     failedGates: readonly GateId[];
     notes: readonly string[];
     visualPlan?: VisualPlan;

@@ -79,6 +79,7 @@ export class ScriptAssembler {
         sourcedText: generated.sourcedNarration,
         citations: generated.citationIds.map((id) => byId.get(id)).filter((c) => c !== undefined),
         visualIntent: generated.visualIntent,
+        continuesBoard: generated.continuesBoard === true,
         estimatedDuration: duration.estimateSpokenDuration(
           spoken.split(/\s+/).filter(Boolean).length, language.code,
         ),

@@ -29,6 +29,13 @@ export interface GeneratedScene {
   readonly sourcedNarration: string;
   readonly citationIds: readonly string[];
   readonly visualIntent: DiagramShape;
+  /**
+   * True to build on the previous scene's board rather than wiping to a new one.
+   *
+   * Honoured only when the shapes agree and the scene is not the first — see
+   * `groupIntoBoards`, which is where the rule lives.
+   */
+  readonly continuesBoard?: boolean;
 }
 
 export interface ScriptGenerationResult {

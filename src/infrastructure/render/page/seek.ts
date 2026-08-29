@@ -88,7 +88,84 @@ export const SEEK_SCRIPT = String.raw`
     return 1 + s * inv * inv * inv + c * inv * inv;
   }
 
+  /**
+   * When each step of the build begins, board-relative, stamped in Node.
+   *
+   * A board spans several scenes and each is a step; the boundaries are the
+   * scenes' measured audio durations, which only Node knows. Computed there and
+   * carried as data so this stays a pure function of ms — the same
+   * millisecond has to produce the same pixels on any worker.
+   *
+   * A one-step board yields [0], and everything below reduces to "nothing is
+   * ever dimmed", which is what a board narrated by a single scene should do.
+   */
+  var stepStarts = (root.dataset.stepStarts || '0')
+    .split(',')
+    .map(Number)
+    .filter(function (n) { return isFinite(n); });
+
+  /** How long an element takes to recede once its step is over. */
+  var dimMs = Number(root.dataset.stepDimMs || '0') || revealMs;
+
   window.__seekTo = function (ms) {
+    /**
+     * Which step is being narrated, and how far each past step has receded.
+     *
+     * An element belonging to step S starts receding when step S+1 begins, over
+     * dimMs. The current step and every step still to come sit at 0. This is
+     * derived from ms alone rather than tracked as state, so seeking backwards
+     * gives exactly the frame seeking forwards did.
+     */
+    var current = 1;
+    for (var s = 0; s < stepStarts.length; s++) {
+      if (ms >= stepStarts[s]) current = s + 1;
+    }
+    root.setAttribute('data-current-step', String(current));
+
+    var stepped = document.querySelectorAll('[data-step]');
+    for (var k = 0; k < stepped.length; k++) {
+      var element = stepped[k];
+      var step = Number(element.getAttribute('data-step')) || 1;
+
+      /**
+       * A step is a hard gate on visibility, not only a dimming cue.
+       *
+       * An element's reveal time comes from an anchor phrase, and an anchor
+       * that fails to match inherits the *previous* element's time (see
+       * SceneTimeline). Across a board that previous element may belong to an
+       * earlier step, so one unmatched phrase could otherwise put a step-3 node
+       * on screen during step 1 — the board would give away its own ending.
+       * Gating on the step bounds that damage: a missed anchor can now only
+       * mistime an element within its own step.
+       *
+       * visibility rather than display, so the element keeps its box. The whole
+       * board is laid out once and the geometry must not move as steps arrive —
+       * that is what lets the collision and overflow checks measure a board once
+       * and have the answer hold for every step of it.
+       */
+      var arrivesAt = stepStarts[step - 1];
+      if (arrivesAt !== undefined && ms < arrivesAt) {
+        element.setAttribute('data-step-pending', '1');
+      } else {
+        element.removeAttribute('data-step-pending');
+      }
+
+      // The start of the *next* step is when this one begins to recede.
+      var recedesAt = stepStarts[step];
+      var dim = 0;
+      if (recedesAt !== undefined && ms > recedesAt) {
+        dim = clamp01((ms - recedesAt) / (dimMs <= 0 ? 1 : dimMs));
+      }
+
+      if (dim > 0) {
+        element.style.setProperty('--dim', String(dim));
+        element.setAttribute('data-dimmed', '1');
+      } else {
+        element.style.removeProperty('--dim');
+        element.removeAttribute('data-dimmed');
+      }
+    }
+
     var nodes = document.querySelectorAll('[data-reveal-at]');
 
     for (var i = 0; i < nodes.length; i++) {
